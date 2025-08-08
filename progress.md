@@ -5,6 +5,17 @@ Building a serverless Cloudflare Worker application that monitors Costco Travel 
 
 ## Recent Changes (Latest First)
 
+### 2025-01-08 - Enhanced HTML Parsing for Better Content Extraction
+- **Enhancement**: Improved HTML parsing field selectors
+- **Files Modified**: 
+  - `src/utils.ts` - Enhanced field selector patterns
+- **Changes Made**:
+  - Added `p` (paragraph) tags to perk field selector patterns
+  - Improved content extraction for promotional benefits and offers
+  - Better handling of unstructured promotional content
+- **Impact**: More robust extraction of promotional perks from various HTML structures
+- **Requirements Enhanced**: 3.1 (HTML parsing and content extraction)
+
 ### 2025-01-08 - HTML Parsing and Content Fetching Implementation
 - **Completed**: Tasks 3.1 and 3.2 - HTML parsing and content fetching
 - **Files Enhanced**: 

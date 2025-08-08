@@ -625,6 +625,27 @@ describe('parsePromotions', () => {
         expect(promotions[0]).toHaveProperty('price');
         expect(promotions[0].id).toMatch(/^[0-9a-f]{16}$/);
     });
+
+    it('should parse Costco Travel-style promotional content', async () => {
+        // Test with HTML structure similar to actual Costco Travel deals page
+        const html = `
+            <div class="deal-item">
+                <h3>Kauai: Sheraton Kauai Coconut Beach Resort Package</h3>
+                <p>Stay 4 / Pay 3</p>
+                <p>Digital Costco Shop Card</p>
+                <p>Book by 8/9/25</p>
+            </div>
+        `;
+        
+        const promotions = await parsePromotions(html, '.deal-item');
+        
+        expect(promotions).toHaveLength(1);
+        expect(promotions[0].title).toBe('Kauai: Sheraton Kauai Coconut Beach Resort Package');
+        expect(promotions[0]).toHaveProperty('perk');
+        expect(promotions[0]).toHaveProperty('dates');
+        expect(promotions[0]).toHaveProperty('price');
+        expect(promotions[0].id).toMatch(/^[0-9a-f]{16}$/);
+    });
 });
 
 describe('fetchContent', () => {
