@@ -1,0 +1,18 @@
+name = "costco-travel-watcher"
+main = "src/index.ts"
+compatibility_date = "2025-08-08"
+compatibility_flags = ["nodejs_compat"]
+
+[env.production]
+kv_namespaces = [
+  { binding = "DEAL_WATCHER", id = "your-kv-namespace-id" }
+]
+
+[env.production.vars]
+# Environment variables will be set via wrangler secret put
+# ADMIN_TOKEN = "your-admin-token"
+# SLACK_WEBHOOK = "your-slack-webhook-url"
+
+# Cron trigger - runs every 3 hours
+[[triggers.crons]]
+cron = "0 */3 * * *"
