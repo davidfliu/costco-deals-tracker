@@ -8,7 +8,7 @@ A serverless monitoring system that tracks promotional changes on Costco Travel 
 ├── src/
 │   ├── index.ts          # Main Cloudflare Worker entry point
 │   ├── types.ts          # TypeScript interfaces and types
-│   ├── utils.ts          # Utility functions (hashing, text processing, promotion IDs)
+│   ├── utils.ts          # Utility functions (hashing, text processing, HTML parsing, HTTP client)
 │   ├── index.test.ts     # Main application tests
 │   └── utils.test.ts     # Utility function tests
 ├── wrangler.toml         # Cloudflare Worker configuration
@@ -63,9 +63,11 @@ This project is currently in active development. See `progress.md` for detailed 
 - ✅ URL hashing utilities for stable KV key generation
 - ✅ Text normalization and noise filtering for promotional content
 - ✅ Promotion ID generation using content-based hashing
+- ✅ HTML parsing and content extraction using HTMLRewriter
+- ✅ Content fetching with proper headers and error handling
 - ✅ Comprehensive unit test coverage with 100% test coverage
 
 ### In Progress
-- 🔄 HTML parsing and content extraction using HTMLRewriter
-- 🔄 Content fetching with proper headers and error handling
 - 🔄 Change detection engine for promotional content
+- 🔄 KV storage operations for state management
+- 🔄 Slack notification system

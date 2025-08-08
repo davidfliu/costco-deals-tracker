@@ -6,7 +6,7 @@
   - Set up environment variable bindings for KV namespace and secrets
   - _Requirements: 8.1, 8.2_
 
-- [ ] 2. Implement core data models and utilities
+- [x] 2. Implement core data models and utilities
   - [x] 2.1 Create URL hashing utility function
     - ✅ Write SHA-256 hashing function for generating stable URL-based keys
     - ✅ Implement key generation for state and history storage
@@ -14,26 +14,26 @@
     - _Requirements: 5.1_
     - _Completed: 2025-01-08 - Implemented hashString, generateStateKey, generateHistoryKey with comprehensive tests_
 
-  - [ ] 2.2 Implement text normalization utilities
+  - [x] 2.2 Implement text normalization utilities
     - Write function to collapse whitespace and remove timestamps from promotional text
     - Create regex patterns for filtering noise (tracking codes, irrelevant counters)
     - Write unit tests with various text input scenarios
     - _Requirements: 3.1, 3.4_
 
-  - [ ] 2.3 Create promotion ID generation
+  - [x] 2.3 Create promotion ID generation
     - Implement stable hashing of promotion content (title|perk|dates|price)
     - Write function to generate unique promotion IDs
     - Write unit tests to verify ID stability and uniqueness
     - _Requirements: 3.2_
 
-- [ ] 3. Build HTML parsing and content extraction
-  - [ ] 3.1 Implement promotion parser using HTMLRewriter
+- [x] 3. Build HTML parsing and content extraction
+  - [x] 3.1 Implement promotion parser using HTMLRewriter
     - Write HTMLRewriter-based parser to extract promotional content using CSS selectors
     - Create promotion object builder from extracted HTML elements
     - Write unit tests with sanitized HTML fixtures from Costco Travel pages
     - _Requirements: 3.1, 8.3_
 
-  - [ ] 3.2 Create content fetching with proper headers
+  - [x] 3.2 Create content fetching with proper headers
     - Implement fetch wrapper with User-Agent header and timeout handling
     - Add error handling for non-200 responses and network failures
     - Write unit tests with mock fetch responses

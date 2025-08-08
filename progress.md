@@ -5,6 +5,26 @@ Building a serverless Cloudflare Worker application that monitors Costco Travel 
 
 ## Recent Changes (Latest First)
 
+### 2025-01-08 - HTML Parsing and Content Fetching Implementation
+- **Completed**: Tasks 3.1 and 3.2 - HTML parsing and content fetching
+- **Files Enhanced**: 
+  - `src/utils.ts` - Added HTML parsing and content fetching functions
+- **Features Implemented**:
+  - `parsePromotions()` - Dual-mode HTML parsing (HTMLRewriter for Workers, DOM for tests)
+  - `parsePromotionsWithHTMLRewriter()` - Cloudflare Workers HTMLRewriter implementation
+  - `parsePromotionsWithDOM()` - Fallback DOM parsing for test environment
+  - `parsePromotionFromHTML()` - Single promotion extraction from HTML content
+  - `buildPromotionFromFields()` - Promotion object construction from extracted fields
+  - `parsePromotionsFromText()` - Fallback text-based promotion parsing
+  - `fetchContent()` - HTTP client with proper headers, timeout, and error handling
+- **Technical Features**:
+  - Environment detection for HTMLRewriter vs DOM parsing
+  - CSS selector-based field extraction (title, perk, dates, price)
+  - Regex-based HTML parsing for structured content
+  - Comprehensive error handling for network requests
+  - User-Agent spoofing for web scraping compatibility
+- **Requirements Satisfied**: 3.1, 3.3, 6.1, 6.2, 8.3 (HTML parsing, content extraction, HTTP fetching)
+
 ### 2025-01-08 - Text Processing and Promotion ID Generation
 - **Completed**: Tasks 2.2 and 2.3 - Text normalization and promotion ID generation
 - **Files Enhanced**: 
@@ -37,22 +57,14 @@ Building a serverless Cloudflare Worker application that monitors Costco Travel 
 - [x] 2.1 Create URL hashing utility function
 - [x] 2.2 Implement text normalization utilities
 - [x] 2.3 Create promotion ID generation
+- [x] 3.1 Implement promotion parser using HTMLRewriter
+- [x] 3.2 Create content fetching with proper headers
 
 ### 🔄 In Progress
-- [ ] 3.1 Implement promotion parser using HTMLRewriter
+- [ ] 4.1 Build promotion comparison engine
 
 ### 📋 Next Steps
-1. **HTML Parsing** (Task 3.1)
-   - Build HTMLRewriter-based promotion parser
-   - Extract promotional content using CSS selectors
-   - Create promotion object builders
-
-2. **Content Fetching** (Task 3.2)
-   - Implement fetch wrapper with proper headers
-   - Add error handling for network failures
-   - Write unit tests with mock responses
-
-3. **Change Detection** (Task 4.1)
+1. **Change Detection** (Task 4.1)
    - Build promotion comparison engine
    - Implement detection of added, removed, and changed promotions
    - Create change result objects
@@ -72,6 +84,9 @@ Building a serverless Cloudflare Worker application that monitors Costco Travel 
 - **Multi-stage text processing**: Separate normalization and noise filtering for flexibility
 - **Comprehensive regex patterns**: Handles various promotional noise patterns and tracking codes
 - **Content-based promotion IDs**: Ensures stable identification across scraping sessions
+- **Dual-mode HTML parsing**: HTMLRewriter for Workers runtime, DOM parsing for test environment
+- **Fallback parsing strategies**: Text-based parsing when structured HTML extraction fails
+- **Robust HTTP client**: Timeout handling, proper headers, content-type validation
 
 ### Performance Metrics
 - **Hash generation**: Sub-millisecond execution
