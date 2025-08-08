@@ -7,11 +7,12 @@
   - _Requirements: 8.1, 8.2_
 
 - [ ] 2. Implement core data models and utilities
-  - [ ] 2.1 Create URL hashing utility function
-    - Write SHA-256 hashing function for generating stable URL-based keys
-    - Implement key generation for state and history storage
-    - Write unit tests for hash consistency and collision avoidance
+  - [x] 2.1 Create URL hashing utility function
+    - ✅ Write SHA-256 hashing function for generating stable URL-based keys
+    - ✅ Implement key generation for state and history storage
+    - ✅ Write unit tests for hash consistency and collision avoidance
     - _Requirements: 5.1_
+    - _Completed: 2025-01-08 - Implemented hashString, generateStateKey, generateHistoryKey with comprehensive tests_
 
   - [ ] 2.2 Implement text normalization utilities
     - Write function to collapse whitespace and remove timestamps from promotional text

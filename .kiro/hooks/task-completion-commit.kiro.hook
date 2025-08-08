@@ -1,0 +1,21 @@
+{
+  "enabled": true,
+  "name": "Task Completion Commit",
+  "description": "After completing a task, commit the code changes using the conventionalcommits standard and a description of the changes. Also update the progress.md file to summarize the recent changes made, and update the README.md if necessary.",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "src/**/*.ts",
+      "src/**/*.js",
+      "package.json",
+      "tsconfig.json",
+      "vitest.config.ts",
+      "wrangler.toml"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "A task has been completed with changes to the codebase. Please:\n\n1. Review the recent changes made to the files\n2. Create a git commit using conventional commits standard with an appropriate type (feat, fix, docs, style, refactor, test, chore) and a clear description of what was changed\n3. Update or create a progress.md file to summarize the recent changes and current project status\n4. Review and update the README.md file if the changes affect installation, usage, or project description\n\nMake sure the commit message follows the format: type(scope): description, where scope is optional but helpful for larger projects."
+  }
+}

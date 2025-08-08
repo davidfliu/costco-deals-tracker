@@ -8,11 +8,14 @@ A serverless monitoring system that tracks promotional changes on Costco Travel 
 ├── src/
 │   ├── index.ts          # Main Cloudflare Worker entry point
 │   ├── types.ts          # TypeScript interfaces and types
-│   └── index.test.ts     # Unit tests
+│   ├── utils.ts          # Utility functions (hashing, key generation)
+│   ├── index.test.ts     # Main application tests
+│   └── utils.test.ts     # Utility function tests
 ├── wrangler.toml         # Cloudflare Worker configuration
 ├── package.json          # Node.js dependencies and scripts
 ├── tsconfig.json         # TypeScript configuration
-└── vitest.config.ts      # Test configuration
+├── vitest.config.ts      # Test configuration
+└── progress.md           # Development progress tracking
 ```
 
 ## Setup
@@ -51,3 +54,16 @@ Before deploying, set up the following environment variables:
 ## KV Namespace
 
 Create a KV namespace called `DEAL_WATCHER` and update the namespace ID in `wrangler.toml`.
+
+## Development Status
+
+This project is currently in active development. See `progress.md` for detailed implementation status and recent changes.
+
+### Completed Features
+- ✅ URL hashing utilities for stable KV key generation
+- ✅ Comprehensive unit test coverage
+
+### In Progress
+- 🔄 Text normalization utilities
+- 🔄 Promotion ID generation
+- 🔄 HTML parsing and content extraction
