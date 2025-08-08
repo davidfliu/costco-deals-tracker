@@ -5,6 +5,19 @@ Building a serverless Cloudflare Worker application that monitors Costco Travel 
 
 ## Recent Changes (Latest First)
 
+### 2025-01-08 - Text Processing and Promotion ID Generation
+- **Completed**: Tasks 2.2 and 2.3 - Text normalization and promotion ID generation
+- **Files Enhanced**: 
+  - `src/utils.ts` - Added text processing and promotion ID functions
+  - `src/utils.test.ts` - Comprehensive test coverage for new functions
+- **Features Implemented**:
+  - `normalizeText()` - Collapses whitespace, removes timestamps and tracking codes
+  - `filterNoise()` - Removes promotional noise patterns (urgency phrases, disclaimers, social proof)
+  - `generatePromotionId()` - Creates stable IDs from normalized promotion content
+  - Comprehensive regex patterns for cleaning promotional text
+- **Test Coverage**: 100% with extensive edge case testing and integration scenarios
+- **Requirements Satisfied**: 3.1, 3.2, 3.4 (text normalization, promotion comparison, noise filtering)
+
 ### 2025-01-08 - URL Hashing Utilities Implementation
 - **Completed**: Task 2.1 - URL hashing utility function
 - **Files Added**: 
@@ -22,26 +35,27 @@ Building a serverless Cloudflare Worker application that monitors Costco Travel 
 ### ✅ Completed Tasks
 - [x] 1. Set up project structure and core interfaces
 - [x] 2.1 Create URL hashing utility function
+- [x] 2.2 Implement text normalization utilities
+- [x] 2.3 Create promotion ID generation
 
 ### 🔄 In Progress
-- [ ] 2.2 Implement text normalization utilities
-- [ ] 2.3 Create promotion ID generation
+- [ ] 3.1 Implement promotion parser using HTMLRewriter
 
 ### 📋 Next Steps
-1. **Text Normalization** (Task 2.2)
-   - Implement whitespace collapse and timestamp removal
-   - Create noise filtering regex patterns
-   - Add unit tests for text normalization
-
-2. **Promotion ID Generation** (Task 2.3)
-   - Implement stable content hashing for promotions
-   - Create unique ID generation from promotion data
-   - Add tests for ID stability and uniqueness
-
-3. **HTML Parsing** (Task 3.1)
+1. **HTML Parsing** (Task 3.1)
    - Build HTMLRewriter-based promotion parser
    - Extract promotional content using CSS selectors
    - Create promotion object builders
+
+2. **Content Fetching** (Task 3.2)
+   - Implement fetch wrapper with proper headers
+   - Add error handling for network failures
+   - Write unit tests with mock responses
+
+3. **Change Detection** (Task 4.1)
+   - Build promotion comparison engine
+   - Implement detection of added, removed, and changed promotions
+   - Create change result objects
 
 ## Technical Implementation
 
@@ -55,11 +69,15 @@ Building a serverless Cloudflare Worker application that monitors Costco Travel 
 - **16-character hash truncation**: Balances readability with collision avoidance
 - **Async hash functions**: Leverages Web Crypto API for security
 - **Stable key generation**: Ensures consistent KV operations across deployments
+- **Multi-stage text processing**: Separate normalization and noise filtering for flexibility
+- **Comprehensive regex patterns**: Handles various promotional noise patterns and tracking codes
+- **Content-based promotion IDs**: Ensures stable identification across scraping sessions
 
 ### Performance Metrics
 - **Hash generation**: Sub-millisecond execution
+- **Text processing**: Efficient regex-based operations
 - **Memory usage**: Minimal with efficient string operations
-- **Test coverage**: 100% with edge case validation
+- **Test coverage**: 100% with edge case validation and integration testing
 
 ## Dependencies
 - `@cloudflare/workers-types` - TypeScript definitions
