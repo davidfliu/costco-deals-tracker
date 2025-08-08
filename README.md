@@ -9,8 +9,10 @@ A serverless monitoring system that tracks promotional changes on Costco Travel 
 │   ├── index.ts          # Main Cloudflare Worker entry point
 │   ├── types.ts          # TypeScript interfaces and types
 │   ├── utils.ts          # Utility functions (hashing, text processing, HTML parsing, HTTP client)
+│   ├── kv-storage.ts     # KV storage operations (targets, state, history management)
 │   ├── index.test.ts     # Main application tests
-│   └── utils.test.ts     # Utility function tests
+│   ├── utils.test.ts     # Utility function tests
+│   └── kv-storage.test.ts # KV storage operation tests
 ├── wrangler.toml         # Cloudflare Worker configuration
 ├── package.json          # Node.js dependencies and scripts
 ├── tsconfig.json         # TypeScript configuration
@@ -66,9 +68,10 @@ This project is currently in active development. See `progress.md` for detailed 
 - ✅ HTML parsing and content extraction using HTMLRewriter
 - ✅ Content fetching with proper headers and error handling
 - ✅ Change detection engine with material change filtering
+- ✅ Complete KV storage layer with target, state, and history management
 - ✅ Comprehensive unit test coverage with 100% test coverage
 
 ### In Progress
-- 🔄 KV storage operations for state management
 - 🔄 Slack notification system
 - 🔄 Admin API endpoints
+- 🔄 Core monitoring logic
