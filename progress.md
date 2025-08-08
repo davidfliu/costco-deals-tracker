@@ -5,6 +5,28 @@ Building a serverless Cloudflare Worker application that monitors Costco Travel 
 
 ## Recent Changes (Latest First)
 
+### 2025-01-08 - Change Detection Logic Implementation
+- **Completed**: Tasks 4.1 and 4.2 - Promotion comparison engine and material change filtering
+- **Files Enhanced**: 
+  - `src/utils.ts` - Added comprehensive change detection functions
+- **Features Implemented**:
+  - `detectChanges()` - Compares current vs previous promotions, categorizes changes
+  - `arePromotionsEqual()` - Compares promotions ignoring cosmetic differences
+  - `generateChangeSummary()` - Creates human-readable change descriptions
+  - `filterMaterialChanges()` - Filters out non-material changes and noise
+  - `isMaterialPromotion()` - Determines if promotion content is meaningful
+  - `isMaterialChange()` - Evaluates if changes between promotions are significant
+  - `isSimilarText()`, `isSimilarPrice()`, `isSimilarDates()` - Field-specific similarity comparisons
+  - `calculateTextSimilarity()` - Levenshtein distance algorithm for text comparison
+- **Technical Features**:
+  - Efficient Map-based promotion lookup by ID
+  - 85% similarity threshold for text comparison tolerance
+  - Price comparison with 1% tolerance for rounding differences
+  - Date comparison with 7-day tolerance for similar dates
+  - Noise pattern detection for filtering non-material content
+  - Comprehensive change categorization (added, removed, changed)
+- **Requirements Satisfied**: 3.2, 3.4 (promotion comparison, material change detection)
+
 ### 2025-01-08 - Enhanced HTML Parsing for Better Content Extraction
 - **Enhancement**: Improved HTML parsing field selectors
 - **Files Modified**: 
@@ -70,15 +92,17 @@ Building a serverless Cloudflare Worker application that monitors Costco Travel 
 - [x] 2.3 Create promotion ID generation
 - [x] 3.1 Implement promotion parser using HTMLRewriter
 - [x] 3.2 Create content fetching with proper headers
+- [x] 4.1 Build promotion comparison engine
+- [x] 4.2 Add material change filtering
 
 ### 🔄 In Progress
-- [ ] 4.1 Build promotion comparison engine
+- [ ] 5.1 Implement target configuration management
 
 ### 📋 Next Steps
-1. **Change Detection** (Task 4.1)
-   - Build promotion comparison engine
-   - Implement detection of added, removed, and changed promotions
-   - Create change result objects
+1. **KV Storage Operations** (Task 5.1)
+   - Implement target configuration management
+   - Add validation for target configuration objects
+   - Write functions to read/write targets array from KV storage
 
 ## Technical Implementation
 

@@ -39,15 +39,15 @@
     - Write unit tests with mock fetch responses
     - _Requirements: 6.1, 6.2_
 
-- [ ] 4. Implement change detection logic
-  - [ ] 4.1 Build promotion comparison engine
+- [x] 4. Implement change detection logic
+  - [x] 4.1 Build promotion comparison engine
     - Write function to compare current vs previous promotion arrays
     - Implement detection of added, removed, and changed promotions by ID
     - Create change result object with categorized differences
     - Write unit tests with various promotion change scenarios
     - _Requirements: 3.2, 3.4_
 
-  - [ ] 4.2 Add material change filtering
+  - [x] 4.2 Add material change filtering
     - Implement logic to determine if changes are material vs cosmetic
     - Filter out changes that match known noise patterns
     - Write unit tests to verify proper filtering of non-material changes

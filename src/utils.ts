@@ -2,7 +2,7 @@
  * Utility functions for the Costco Travel Watcher
  */
 
-import { Promotion } from "./types";
+import { Promotion, ChangeResult } from "./types";
 
 /**
  * Generates a SHA-256 hash of the input string and returns the first 16 characters
@@ -68,7 +68,8 @@ export function normalizeText(text: string): string {
     .replace(/\btrack\S*/gi, '') // track parameters
     .replace(/\bid[:=]\S*/gi, '') // id parameters
     .replace(/\b\d+,?\d*\s*(?:views?|clicks?|visits?)\b/gi, '') // View/click counters with commas
-    .replace(/\b(?:updated|modified|posted):\s*.*$/gim, '') // Update timestamps
+    .replace(/\b(?:updated|modified|posted)[:]\s*.*$/gim, '') // Update timestamps with colons
+    .replace(/\([^)]*(?:updated|modified|posted)[^)]*\)/gi, '') // Update info in parentheses
     // Normalize whitespace but preserve line breaks
     .replace(/[ \t]+/g, ' ') // Collapse spaces and tabs
     .replace(/\n\s*\n\s*/g, '\n') // Remove empty lines
@@ -436,6 +437,392 @@ async function parsePromotionsFromText(text: string): Promise<Promotion[]> {
   }
 
   return promotions;
+}
+
+/**
+ * Compares current promotions with previous promotions to detect changes
+ * 
+ * @param currentPromotions - Current promotion array
+ * @param previousPromotions - Previous promotion array
+ * @returns ChangeResult object with categorized differences
+ */
+export function detectChanges(
+  currentPromotions: Promotion[],
+  previousPromotions: Promotion[]
+): ChangeResult {
+  const added: Promotion[] = [];
+  const removed: Promotion[] = [];
+  const changed: Array<{ previous: Promotion; current: Promotion }> = [];
+
+  // Create maps for efficient lookup by ID
+  const currentMap = new Map(currentPromotions.map(p => [p.id, p]));
+  const previousMap = new Map(previousPromotions.map(p => [p.id, p]));
+
+  // Find added promotions (in current but not in previous)
+  for (const current of currentPromotions) {
+    if (!previousMap.has(current.id)) {
+      added.push(current);
+    }
+  }
+
+  // Find removed promotions (in previous but not in current)
+  for (const previous of previousPromotions) {
+    if (!currentMap.has(previous.id)) {
+      removed.push(previous);
+    }
+  }
+
+  // Find changed promotions (same ID but different content)
+  for (const current of currentPromotions) {
+    const previous = previousMap.get(current.id);
+    if (previous && !arePromotionsEqual(current, previous)) {
+      changed.push({ previous, current });
+    }
+  }
+
+  // Determine if there are material changes
+  const hasChanges = added.length > 0 || removed.length > 0 || changed.length > 0;
+
+  // Generate summary message
+  const summary = generateChangeSummary(added, removed, changed);
+
+  return {
+    hasChanges,
+    added,
+    removed,
+    changed,
+    summary
+  };
+}
+
+/**
+ * Compares two promotions for equality, ignoring cosmetic differences
+ * 
+ * @param promo1 - First promotion to compare
+ * @param promo2 - Second promotion to compare
+ * @returns True if promotions are materially equal
+ */
+function arePromotionsEqual(promo1: Promotion, promo2: Promotion): boolean {
+  // Compare normalized content to ignore cosmetic differences
+  const normalize = (text: string) => filterNoise(normalizeText(text));
+
+  return (
+    normalize(promo1.title) === normalize(promo2.title) &&
+    normalize(promo1.perk) === normalize(promo2.perk) &&
+    normalize(promo1.dates) === normalize(promo2.dates) &&
+    normalize(promo1.price) === normalize(promo2.price)
+  );
+}
+
+/**
+ * Generates a human-readable summary of detected changes
+ * 
+ * @param added - Added promotions
+ * @param removed - Removed promotions
+ * @param changed - Changed promotions
+ * @returns Summary string describing the changes
+ */
+function generateChangeSummary(
+  added: Promotion[],
+  removed: Promotion[],
+  changed: Array<{ previous: Promotion; current: Promotion }>
+): string {
+  const parts: string[] = [];
+
+  if (added.length > 0) {
+    parts.push(`${added.length} new promotion${added.length === 1 ? '' : 's'}`);
+  }
+
+  if (removed.length > 0) {
+    parts.push(`${removed.length} promotion${removed.length === 1 ? '' : 's'} removed`);
+  }
+
+  if (changed.length > 0) {
+    parts.push(`${changed.length} promotion${changed.length === 1 ? '' : 's'} updated`);
+  }
+
+  if (parts.length === 0) {
+    return 'No changes detected';
+  }
+
+  if (parts.length === 1) {
+    return parts[0];
+  }
+
+  if (parts.length === 2) {
+    return parts.join(' and ');
+  }
+
+  return parts.slice(0, -1).join(', ') + ', and ' + parts[parts.length - 1];
+}
+
+/**
+ * Filters out non-material changes from a ChangeResult
+ * 
+ * @param changeResult - Original change result
+ * @returns Filtered change result with only material changes
+ */
+export function filterMaterialChanges(changeResult: ChangeResult): ChangeResult {
+  // Filter added promotions - remove if they appear to be noise
+  const materialAdded = changeResult.added.filter(promo => isMaterialPromotion(promo));
+
+  // Filter removed promotions - remove if they appear to be noise
+  const materialRemoved = changeResult.removed.filter(promo => isMaterialPromotion(promo));
+
+  // Filter changed promotions - remove if changes are not material
+  const materialChanged = changeResult.changed.filter(({ previous, current }) => 
+    isMaterialChange(previous, current)
+  );
+
+  // Determine if there are any material changes
+  const hasChanges = materialAdded.length > 0 || materialRemoved.length > 0 || materialChanged.length > 0;
+
+  // Generate new summary
+  const summary = hasChanges 
+    ? generateChangeSummary(materialAdded, materialRemoved, materialChanged)
+    : 'No material changes detected';
+
+  return {
+    hasChanges,
+    added: materialAdded,
+    removed: materialRemoved,
+    changed: materialChanged,
+    summary
+  };
+}
+
+/**
+ * Determines if a promotion represents material content (not noise)
+ * 
+ * @param promotion - Promotion to evaluate
+ * @returns True if the promotion appears to be material content
+ */
+function isMaterialPromotion(promotion: Promotion): boolean {
+  // Check if promotion has meaningful content
+  const hasTitle = promotion.title && promotion.title.trim().length > 3;
+  const hasPerk = promotion.perk && promotion.perk.trim().length > 10;
+  const hasPrice = promotion.price && /\$[\d,]+/.test(promotion.price);
+  const hasDates = promotion.dates && promotion.dates.trim().length > 5;
+
+  // Must have at least title or perk, and preferably price or dates
+  const hasBasicContent = hasTitle || hasPerk;
+  const hasSpecificContent = hasPrice || hasDates;
+
+  if (!hasBasicContent) {
+    return false;
+  }
+
+  // Check for noise patterns in the content
+  const allText = `${promotion.title} ${promotion.perk} ${promotion.dates} ${promotion.price}`.toLowerCase();
+
+  // Common noise patterns that indicate non-material content
+  const noisePatterns = [
+    /\b(?:loading|please wait|error|404|not found)\b/,
+    /\b(?:javascript|enable|browser|update)\b/,
+    /\b(?:cookie|privacy|terms|legal)\b/,
+    /\b(?:advertisement|sponsored|ad)\b/,
+    /^[\s\W]*$/, // Only whitespace and punctuation
+    /^.{1,5}$/, // Very short content
+  ];
+
+  // If content matches noise patterns, it's not material
+  if (noisePatterns.some(pattern => pattern.test(allText))) {
+    return false;
+  }
+
+  // If we have basic content and no noise patterns, consider it material
+  // Prefer promotions with specific content (price/dates)
+  return hasBasicContent && (hasSpecificContent || hasPerk);
+}
+
+/**
+ * Determines if a change between two promotions is material
+ * 
+ * @param previous - Previous version of promotion
+ * @param current - Current version of promotion
+ * @returns True if the change is material
+ */
+function isMaterialChange(previous: Promotion, current: Promotion): boolean {
+  // Compare key fields for material differences
+  const titleChanged = !isSimilarText(previous.title, current.title);
+  const perkChanged = !isSimilarText(previous.perk, current.perk);
+  const priceChanged = !isSimilarPrice(previous.price, current.price);
+  const datesChanged = !isSimilarDates(previous.dates, current.dates);
+
+  // Any change in title, perk, or price is considered material
+  // Date changes are material only if they represent significant shifts
+  return titleChanged || perkChanged || priceChanged || datesChanged;
+}
+
+/**
+ * Compares two text strings for similarity, ignoring cosmetic differences
+ * 
+ * @param text1 - First text to compare
+ * @param text2 - Second text to compare
+ * @returns True if texts are similar enough to be considered the same
+ */
+function isSimilarText(text1: string, text2: string): boolean {
+  if (!text1 && !text2) return true;
+  if (!text1 || !text2) return false;
+
+  // Normalize both texts
+  const norm1 = filterNoise(normalizeText(text1)).toLowerCase();
+  const norm2 = filterNoise(normalizeText(text2)).toLowerCase();
+
+  // Exact match after normalization
+  if (norm1 === norm2) return true;
+
+  // Check for substantial similarity (allowing for minor differences)
+  const similarity = calculateTextSimilarity(norm1, norm2);
+  return similarity > 0.85; // 85% similarity threshold
+}
+
+/**
+ * Compares two price strings for similarity
+ * 
+ * @param price1 - First price to compare
+ * @param price2 - Second price to compare
+ * @returns True if prices are similar
+ */
+function isSimilarPrice(price1: string, price2: string): boolean {
+  if (!price1 && !price2) return true;
+  if (!price1 || !price2) return false;
+
+  // Extract numeric values from prices
+  const extractPrice = (price: string) => {
+    const matches = price.match(/\$?([\d,]+(?:\.\d{2})?)/g);
+    return matches ? matches.map(m => parseFloat(m.replace(/[$,]/g, ''))) : [];
+  };
+
+  const prices1 = extractPrice(price1);
+  const prices2 = extractPrice(price2);
+
+  // If no prices found in either, compare as text
+  if (prices1.length === 0 && prices2.length === 0) {
+    return isSimilarText(price1, price2);
+  }
+
+  // If different number of prices, they're different
+  if (prices1.length !== prices2.length) return false;
+
+  // Compare each price with small tolerance for rounding
+  for (let i = 0; i < prices1.length; i++) {
+    const diff = Math.abs(prices1[i] - prices2[i]);
+    const tolerance = Math.max(1, prices1[i] * 0.01); // 1% or $1 minimum
+    if (diff > tolerance) return false;
+  }
+
+  return true;
+}
+
+/**
+ * Compares two date strings for similarity
+ * 
+ * @param dates1 - First date string to compare
+ * @param dates2 - Second date string to compare
+ * @returns True if dates are similar
+ */
+function isSimilarDates(dates1: string, dates2: string): boolean {
+  if (!dates1 && !dates2) return true;
+  if (!dates1 || !dates2) return false;
+
+  // Try to extract actual dates
+  const extractDates = (dateStr: string) => {
+    const datePatterns = [
+      /\b(\d{1,2})\/(\d{1,2})\/(\d{2,4})\b/g, // MM/DD/YYYY
+      /\b(\d{4})-(\d{2})-(\d{2})\b/g, // YYYY-MM-DD
+      /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+(\d{1,2}),?\s+(\d{4})\b/gi // Month DD, YYYY
+    ];
+
+    const dates: Date[] = [];
+    for (const pattern of datePatterns) {
+      let match;
+      while ((match = pattern.exec(dateStr)) !== null) {
+        try {
+          let date: Date;
+          if (pattern === datePatterns[0]) { // MM/DD/YYYY
+            date = new Date(parseInt(match[3]), parseInt(match[1]) - 1, parseInt(match[2]));
+          } else if (pattern === datePatterns[1]) { // YYYY-MM-DD
+            date = new Date(parseInt(match[1]), parseInt(match[2]) - 1, parseInt(match[3]));
+          } else { // Month DD, YYYY
+            date = new Date(`${match[1]} ${match[2]}, ${match[3]}`);
+          }
+          if (!isNaN(date.getTime())) {
+            dates.push(date);
+          }
+        } catch (e) {
+          // Ignore invalid dates
+        }
+      }
+    }
+    return dates;
+  };
+
+  const datesA = extractDates(dates1);
+  const datesB = extractDates(dates2);
+
+  // If no dates found in either, compare as text
+  if (datesA.length === 0 && datesB.length === 0) {
+    return isSimilarText(dates1, dates2);
+  }
+
+  // If different number of dates, they might still be similar
+  // Check if any dates are close (within 7 days)
+  if (datesA.length > 0 && datesB.length > 0) {
+    for (const dateA of datesA) {
+      for (const dateB of datesB) {
+        const diffDays = Math.abs(dateA.getTime() - dateB.getTime()) / (1000 * 60 * 60 * 24);
+        if (diffDays <= 7) { // Within a week
+          return true;
+        }
+      }
+    }
+    return false; // No similar dates found
+  }
+
+  // Fallback to text comparison
+  return isSimilarText(dates1, dates2);
+}
+
+/**
+ * Calculates similarity between two strings using a simple algorithm
+ * 
+ * @param str1 - First string
+ * @param str2 - Second string
+ * @returns Similarity score between 0 and 1
+ */
+function calculateTextSimilarity(str1: string, str2: string): number {
+  if (str1 === str2) return 1;
+  if (!str1 || !str2) return 0;
+
+  // Use Levenshtein distance for similarity calculation
+  const matrix: number[][] = [];
+  const len1 = str1.length;
+  const len2 = str2.length;
+
+  // Initialize matrix
+  for (let i = 0; i <= len1; i++) {
+    matrix[i] = [i];
+  }
+  for (let j = 0; j <= len2; j++) {
+    matrix[0][j] = j;
+  }
+
+  // Fill matrix
+  for (let i = 1; i <= len1; i++) {
+    for (let j = 1; j <= len2; j++) {
+      const cost = str1[i - 1] === str2[j - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,     // deletion
+        matrix[i][j - 1] + 1,     // insertion
+        matrix[i - 1][j - 1] + cost // substitution
+      );
+    }
+  }
+
+  const distance = matrix[len1][len2];
+  const maxLength = Math.max(len1, len2);
+  return maxLength === 0 ? 1 : (maxLength - distance) / maxLength;
 }
 
 /**

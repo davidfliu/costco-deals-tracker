@@ -65,9 +65,10 @@ This project is currently in active development. See `progress.md` for detailed 
 - ✅ Promotion ID generation using content-based hashing
 - ✅ HTML parsing and content extraction using HTMLRewriter
 - ✅ Content fetching with proper headers and error handling
+- ✅ Change detection engine with material change filtering
 - ✅ Comprehensive unit test coverage with 100% test coverage
 
 ### In Progress
-- 🔄 Change detection engine for promotional content
 - 🔄 KV storage operations for state management
 - 🔄 Slack notification system
+- 🔄 Admin API endpoints
