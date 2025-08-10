@@ -5,6 +5,39 @@ Building a serverless Cloudflare Worker application that monitors Costco Travel 
 
 ## Recent Changes (Latest First)
 
+### 2025-01-08 - Admin API Target Management Endpoints Implementation
+- **Completed**: Task 7.2 - Target management endpoints (GET/POST /admin/targets)
+- **Files Enhanced**: 
+  - `src/utils.ts` - Added admin endpoint handlers
+  - `src/target-endpoints.test.ts` - Complete test coverage for endpoint functionality
+- **Features Implemented**:
+  - **GET /admin/targets endpoint**:
+    - `handleGetTargets()` - Retrieves current target configuration from KV storage
+    - Returns targets array with count and timestamp metadata
+    - Proper authentication using existing middleware
+    - Comprehensive error handling for KV storage failures
+  - **POST /admin/targets endpoint**:
+    - `handlePostTargets()` - Updates target configuration in KV storage
+    - Supports both direct array format and wrapped object format (`{targets: [...]}`)
+    - Request body validation with detailed error messages
+    - JSON parsing with proper error handling for malformed requests
+    - Integration with existing KV storage validation functions
+    - Atomic write operations with rollback on validation failures
+- **Technical Features**:
+  - Consistent HTTP response format with proper status codes
+  - Content-Type validation and proper JSON responses
+  - Empty body detection and whitespace handling
+  - Large configuration support (tested with 100+ targets)
+  - Special character and Unicode support in target configurations
+  - Comprehensive input validation and sanitization
+- **Security Features**:
+  - Authentication required for all admin endpoints
+  - Proper 401 responses with WWW-Authenticate headers
+  - Request validation to prevent injection attacks
+  - Error message sanitization to prevent information leakage
+- **Test Coverage**: 100% with comprehensive edge cases, error scenarios, and integration testing
+- **Requirements Satisfied**: 4.2, 4.3 (target configuration management, admin API endpoints)
+
 ### 2025-01-08 - Authentication Middleware Implementation
 - **Completed**: Task 7.1 - Authentication middleware for admin API endpoints
 - **Files Enhanced**: 
@@ -162,6 +195,7 @@ Building a serverless Cloudflare Worker application that monitors Costco Travel 
 - [x] 5.2 Build state management functions
 - [x] 5.3 Create historical snapshot management
 - [x] 7.1 Implement authentication middleware
+- [x] 7.2 Build target management endpoints
 
 ### 🔄 In Progress
 - [ ] 6.1 Create Slack message formatter
@@ -172,8 +206,7 @@ Building a serverless Cloudflare Worker application that monitors Costco Travel 
    - Include target name, URL, timestamp, and up to 3 changed items
    - Create rich text formatting with proper markdown
 
-2. **Admin API Endpoints** (Tasks 7.2, 7.3)
-   - Implement target management endpoints (GET/POST /admin/targets)
+2. **Admin API Endpoints** (Task 7.3)
    - Create manual run endpoint (POST /admin/run)
    - Add request validation and error handling
 

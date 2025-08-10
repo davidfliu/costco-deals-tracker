@@ -84,14 +84,14 @@ describe('Slack Notification System', () => {
 
       // Check summary block
       const summaryBlock = message.blocks.find(block => 
-        block.type === 'section' && block.text?.text?.includes('Changes detected')
+        block.type === 'section' && block.text?.text && block.text.text.includes('Changes detected')
       );
       expect(summaryBlock).toBeDefined();
       expect(summaryBlock?.text?.text).toContain('2 new promotions');
 
       // Check new promotions section
       const newPromosHeader = message.blocks.find(block => 
-        block.type === 'section' && block.text?.text?.includes('🆕 New Promotions')
+        block.type === 'section' && block.text?.text && block.text.text.includes('🆕 New Promotions')
       );
       expect(newPromosHeader).toBeDefined();
       expect(newPromosHeader?.text?.text).toContain('(2)');
@@ -115,14 +115,14 @@ describe('Slack Notification System', () => {
 
       // Check updated promotions section
       const updatedPromosHeader = message.blocks.find(block => 
-        block.type === 'section' && block.text?.text?.includes('🔄 Updated Promotions')
+        block.type === 'section' && block.text?.text && block.text.text.includes('🔄 Updated Promotions')
       );
       expect(updatedPromosHeader).toBeDefined();
       expect(updatedPromosHeader?.text?.text).toContain('(1)');
 
       // Should contain both old and new price information
       const promotionBlocks = message.blocks.filter(block => 
-        block.type === 'section' && block.text?.text?.includes('$1,')
+        block.type === 'section' && block.text?.text && block.text.text.includes('$1,')
       );
       expect(promotionBlocks.length).toBeGreaterThan(0);
     });
@@ -145,7 +145,7 @@ describe('Slack Notification System', () => {
 
       // Check removed promotions section
       const removedPromosHeader = message.blocks.find(block => 
-        block.type === 'section' && block.text?.text?.includes('❌ Removed Promotions')
+        block.type === 'section' && block.text?.text && block.text.text.includes('❌ Removed Promotions')
       );
       expect(removedPromosHeader).toBeDefined();
       expect(removedPromosHeader?.text?.text).toContain('(1)');
@@ -169,13 +169,13 @@ describe('Slack Notification System', () => {
 
       // Should have all three types of changes
       const newPromosHeader = message.blocks.find(block => 
-        block.text?.text?.includes('🆕 New Promotions')
+        block.text?.text && block.text.text.includes('🆕 New Promotions')
       );
       const updatedPromosHeader = message.blocks.find(block => 
-        block.text?.text?.includes('🔄 Updated Promotions')
+        block.text?.text && block.text.text.includes('🔄 Updated Promotions')
       );
       const removedPromosHeader = message.blocks.find(block => 
-        block.text?.text?.includes('❌ Removed Promotions')
+        block.text?.text && block.text.text.includes('❌ Removed Promotions')
       );
 
       expect(newPromosHeader).toBeDefined();
@@ -213,8 +213,8 @@ describe('Slack Notification System', () => {
       // Count promotion detail blocks (excluding headers and context)
       const promotionDetailBlocks = message.blocks.filter(block => 
         block.type === 'section' && 
-        block.text?.text?.includes('Deal ') &&
-        !block.text?.text?.includes('🆕')
+        block.text?.text && block.text.text.includes('Deal ') &&
+        !block.text.text.includes('🆕')
       );
 
       expect(promotionDetailBlocks.length).toBeLessThanOrEqual(3);
@@ -222,7 +222,7 @@ describe('Slack Notification System', () => {
       // Should have "... and X more" message
       const moreItemsBlock = message.blocks.find(block => 
         block.type === 'context' && 
-        block.elements?.[0]?.text?.includes('... and')
+        block.elements?.[0]?.text && block.elements[0].text.includes('... and')
       );
       expect(moreItemsBlock).toBeDefined();
       expect(moreItemsBlock?.elements?.[0]?.text).toContain('7 more new promotions');
@@ -584,10 +584,10 @@ describe('Slack Notification System', () => {
       // Should limit the number of detailed items shown
       const promotionDetailBlocks = message.blocks.filter(block => 
         block.type === 'section' && 
-        block.text?.text?.includes('Deal ') &&
-        !block.text?.text?.includes('🆕') &&
-        !block.text?.text?.includes('🔄') &&
-        !block.text?.text?.includes('❌')
+        block.text?.text && block.text.text.includes('Deal ') &&
+        !block.text.text.includes('🆕') &&
+        !block.text.text.includes('🔄') &&
+        !block.text.text.includes('❌')
       );
 
       expect(promotionDetailBlocks.length).toBeLessThanOrEqual(3);
@@ -595,7 +595,7 @@ describe('Slack Notification System', () => {
       // Should have "more items" indicators
       const moreItemsBlocks = message.blocks.filter(block => 
         block.type === 'context' && 
-        block.elements?.[0]?.text?.includes('... and')
+        block.elements?.[0]?.text && block.elements[0].text.includes('... and')
       );
 
       expect(moreItemsBlocks.length).toBeGreaterThan(0);

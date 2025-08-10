@@ -2,7 +2,7 @@
  * Unit tests for authentication middleware
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { 
   validateAdminToken, 
   extractAuthToken, 
@@ -295,7 +295,7 @@ describe('Authentication Middleware', () => {
       expect(response.headers.get('Content-Type')).toBe('application/json');
       expect(response.headers.get('WWW-Authenticate')).toBe('Bearer');
       
-      const body = await response.json();
+      const body = await response.json() as any;
       expect(body.error).toBe('Invalid authorization token');
       expect(body.code).toBe('UNAUTHORIZED');
     });
@@ -309,7 +309,7 @@ describe('Authentication Middleware', () => {
       
       expect(response.status).toBe(401);
       
-      const body = await response.json();
+      const body = await response.json() as any;
       expect(body.error).toBe('Authentication failed');
       expect(body.code).toBe('UNAUTHORIZED');
     });
@@ -321,7 +321,7 @@ describe('Authentication Middleware', () => {
       };
       
       const response = createAuthErrorResponse(authResult);
-      const body = await response.json();
+      const body = await response.json() as any;
       
       expect(typeof body).toBe('object');
       expect(body.error).toBe('Missing authorization token');

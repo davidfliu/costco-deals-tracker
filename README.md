@@ -70,9 +70,10 @@ This project is currently in active development. See `progress.md` for detailed 
 - ✅ Change detection engine with material change filtering
 - ✅ Complete KV storage layer with target, state, and history management
 - ✅ Authentication middleware with constant-time token validation
+- ✅ Admin API target management endpoints (GET/POST /admin/targets)
 - ✅ Comprehensive unit test coverage with 100% test coverage
 
 ### In Progress
 - 🔄 Slack notification system
-- 🔄 Admin API endpoints
 - 🔄 Core monitoring logic
+- 🔄 Manual run endpoint

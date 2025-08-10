@@ -2,7 +2,7 @@
  * Utility functions for the Costco Travel Watcher
  */
 
-import { Promotion, ChangeResult } from "./types";
+import { Promotion, ChangeResult, Env } from "./types";
 
 /**
  * Generates a SHA-256 hash of the input string and returns the first 16 characters
@@ -1412,5 +1412,206 @@ export async function fetchContent(url: string, timeoutMs: number = 30000): Prom
     }
 
     throw new Error(`Fetch failed: ${String(error)}`);
+  }
+}
+/**
+ *
+ Handles GET /admin/targets endpoint - retrieves current target configuration
+ * 
+ * @param request - HTTP request object
+ * @param env - Environment variables containing KV namespace and admin token
+ * @returns HTTP response with targets configuration or error
+ */
+export async function handleGetTargets(request: Request, env: Env): Promise<Response> {
+  // Authenticate the request
+  const authResult = authenticateAdminRequest(request, env.ADMIN_TOKEN);
+  if (!authResult.authenticated) {
+    return createAuthErrorResponse(authResult);
+  }
+
+  try {
+    // Import KV storage functions
+    const { readTargets } = await import('./kv-storage');
+    
+    // Read targets from KV storage
+    const targets = await readTargets(env);
+    
+    // Return targets configuration
+    return new Response(
+      JSON.stringify({
+        targets,
+        count: targets.length,
+        timestamp: new Date().toISOString()
+      }, null, 2),
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+  } catch (error) {
+    console.error('Failed to retrieve targets:', error);
+    
+    return new Response(
+      JSON.stringify({
+        error: 'Failed to retrieve targets configuration',
+        code: 'INTERNAL_ERROR',
+        details: error instanceof Error ? error.message : String(error)
+      }),
+      {
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+  }
+}
+
+/**
+ * Handles POST /admin/targets endpoint - updates target configuration
+ * 
+ * @param request - HTTP request object with targets in body
+ * @param env - Environment variables containing KV namespace and admin token
+ * @returns HTTP response with success confirmation or error
+ */
+export async function handlePostTargets(request: Request, env: Env): Promise<Response> {
+  // Authenticate the request
+  const authResult = authenticateAdminRequest(request, env.ADMIN_TOKEN);
+  if (!authResult.authenticated) {
+    return createAuthErrorResponse(authResult);
+  }
+
+  try {
+    // Parse request body
+    let requestBody: any;
+    try {
+      const bodyText = await request.text();
+      if (!bodyText.trim()) {
+        return new Response(
+          JSON.stringify({
+            error: 'Request body is required',
+            code: 'INVALID_REQUEST'
+          }),
+          {
+            status: 400,
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+      }
+      requestBody = JSON.parse(bodyText);
+    } catch (parseError) {
+      return new Response(
+        JSON.stringify({
+          error: 'Invalid JSON in request body',
+          code: 'INVALID_JSON',
+          details: parseError instanceof Error ? parseError.message : String(parseError)
+        }),
+        {
+          status: 400,
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+    }
+
+    // Validate request structure
+    if (!requestBody || typeof requestBody !== 'object') {
+      return new Response(
+        JSON.stringify({
+          error: 'Request body must be an object',
+          code: 'INVALID_REQUEST'
+        }),
+        {
+          status: 400,
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+    }
+
+    // Extract targets from request body
+    let targets: any;
+    if (Array.isArray(requestBody)) {
+      // Direct array of targets
+      targets = requestBody;
+    } else if (requestBody.targets && Array.isArray(requestBody.targets)) {
+      // Wrapped in targets property
+      targets = requestBody.targets;
+    } else {
+      return new Response(
+        JSON.stringify({
+          error: 'Request must contain a "targets" array or be an array of targets',
+          code: 'INVALID_REQUEST'
+        }),
+        {
+          status: 400,
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+    }
+
+    // Import KV storage functions
+    const { writeTargets, validateTargets } = await import('./kv-storage');
+    
+    // Validate targets configuration
+    if (!validateTargets(targets)) {
+      return new Response(
+        JSON.stringify({
+          error: 'Invalid targets configuration',
+          code: 'INVALID_TARGETS',
+          details: 'Each target must have url and selector properties, with optional name, notes, and enabled properties'
+        }),
+        {
+          status: 400,
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+    }
+
+    // Write targets to KV storage
+    await writeTargets(env, targets);
+    
+    // Return success response
+    return new Response(
+      JSON.stringify({
+        message: 'Targets configuration updated successfully',
+        count: targets.length,
+        timestamp: new Date().toISOString()
+      }),
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+  } catch (error) {
+    console.error('Failed to update targets:', error);
+    
+    return new Response(
+      JSON.stringify({
+        error: 'Failed to update targets configuration',
+        code: 'INTERNAL_ERROR',
+        details: error instanceof Error ? error.message : String(error)
+      }),
+      {
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }
+    );
   }
 }
