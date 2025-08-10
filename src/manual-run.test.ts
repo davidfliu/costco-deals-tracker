@@ -64,7 +64,7 @@ describe('Manual Run Endpoint', () => {
       expect(response.headers.get('Content-Type')).toBe('application/json');
       expect(response.headers.get('WWW-Authenticate')).toBe('Bearer');
       
-      const body = await response.json();
+      const body = await response.json() as any;
       expect(body.error).toBe('Missing authorization token');
       expect(body.code).toBe('UNAUTHORIZED');
       expect(mockReadTargets).not.toHaveBeenCalled();
@@ -82,7 +82,7 @@ describe('Manual Run Endpoint', () => {
       
       expect(response.status).toBe(401);
       
-      const body = await response.json();
+      const body = await response.json() as any;
       expect(body.error).toBe('Invalid authorization token');
       expect(mockReadTargets).not.toHaveBeenCalled();
     });
@@ -120,7 +120,7 @@ describe('Manual Run Endpoint', () => {
       expect(response.status).toBe(200);
       expect(response.headers.get('Content-Type')).toBe('application/json');
       
-      const body = await response.json();
+      const body = await response.json() as any;
       expect(body.message).toBe('Manual run completed - no targets configured');
       expect(body.timestamp).toBeDefined();
       expect(body.duration).toBeGreaterThanOrEqual(0);
@@ -145,7 +145,7 @@ describe('Manual Run Endpoint', () => {
       
       expect(response.status).toBe(200);
       
-      const body = await response.json();
+      const body = await response.json() as any;
       expect(body.message).toBe('Manual run completed - no enabled targets');
       expect(body.results.processed).toBe(0);
     });
@@ -164,7 +164,7 @@ describe('Manual Run Endpoint', () => {
       
       expect(response.status).toBe(200);
       
-      const body = await response.json();
+      const body = await response.json() as any;
       expect(body.message).toBe('Manual run completed successfully');
       expect(body.results.processed).toBe(2); // Only Hawaii and Europe (enabled)
       expect(body.results.successful).toBe(2);
@@ -196,7 +196,7 @@ describe('Manual Run Endpoint', () => {
       
       expect(response.status).toBe(200);
       
-      const body = await response.json();
+      const body = await response.json() as any;
       // All targets should be processed since enabled defaults to true
       expect(body.results.processed).toBe(3);
       expect(body.results.successful).toBe(3);
@@ -229,7 +229,7 @@ describe('Manual Run Endpoint', () => {
       
       expect(response.status).toBe(200);
       
-      const body = await response.json();
+      const body = await response.json() as any;
       expect(body.results.processed).toBe(2);
       expect(body.results.targets[0].name).toBe('Unnamed Target');
       expect(body.results.targets[1].name).toBe('Named Target');
@@ -252,7 +252,7 @@ describe('Manual Run Endpoint', () => {
       expect(response.status).toBe(200);
       expect(response.headers.get('Content-Type')).toBe('application/json');
       
-      const body = await response.json();
+      const body = await response.json() as any;
       
       // Check required fields
       expect(body.message).toBeDefined();
@@ -287,7 +287,7 @@ describe('Manual Run Endpoint', () => {
 
       const response = await handleManualRun(request, mockEnv);
       
-      const body = await response.json();
+      const body = await response.json() as any;
       
       expect(body.results.targets).toHaveLength(1);
       const target = body.results.targets[0];
@@ -315,7 +315,7 @@ describe('Manual Run Endpoint', () => {
       expect(response.status).toBe(500);
       expect(response.headers.get('Content-Type')).toBe('application/json');
       
-      const body = await response.json();
+      const body = await response.json() as any;
       expect(body.error).toBe('Failed to execute manual run');
       expect(body.code).toBe('INTERNAL_ERROR');
       expect(body.details).toBe('KV storage unavailable');
@@ -335,7 +335,7 @@ describe('Manual Run Endpoint', () => {
       
       expect(response.status).toBe(500);
       
-      const body = await response.json();
+      const body = await response.json() as any;
       expect(body.details).toBe('String error');
     });
 
@@ -400,7 +400,7 @@ describe('Manual Run Endpoint', () => {
       
       expect(response.status).toBe(200);
       
-      const body = await response.json();
+      const body = await response.json() as any;
       
       // Should complete within reasonable time (less than 1 second for simulation)
       expect(endTime - startTime).toBeLessThan(1000);
@@ -426,7 +426,7 @@ describe('Manual Run Endpoint', () => {
 
       const response = await handleManualRun(request, mockEnv);
       
-      const body = await response.json();
+      const body = await response.json() as any;
       
       expect(body.results.processed).toBe(2);
       expect(body.results.targets).toHaveLength(2);
@@ -456,7 +456,7 @@ describe('Manual Run Endpoint', () => {
 
       const response = await handleManualRun(request, mockEnv);
       
-      const body = await response.json();
+      const body = await response.json() as any;
       
       // Should process about 33 targets (2/3 of 50)
       expect(body.results.processed).toBeGreaterThan(30);

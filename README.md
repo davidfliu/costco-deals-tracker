@@ -6,13 +6,21 @@ A serverless monitoring system that tracks promotional changes on Costco Travel 
 
 ```
 ├── src/
-│   ├── index.ts          # Main Cloudflare Worker entry point
-│   ├── types.ts          # TypeScript interfaces and types
-│   ├── utils.ts          # Utility functions (hashing, text processing, HTML parsing, HTTP client)
-│   ├── kv-storage.ts     # KV storage operations (targets, state, history management)
-│   ├── index.test.ts     # Main application tests
-│   ├── utils.test.ts     # Utility function tests
-│   └── kv-storage.test.ts # KV storage operation tests
+│   ├── index.ts              # Main Cloudflare Worker entry point
+│   ├── types.ts              # TypeScript interfaces and types
+│   ├── utils.ts              # Utility functions (hashing, text processing, HTML parsing, HTTP client, Slack notifications, admin endpoints)
+│   ├── kv-storage.ts         # KV storage operations (targets, state, history management)
+│   ├── target-processing.ts  # Core target processing logic (single and batch processing)
+│   ├── index.test.ts         # Main application tests
+│   ├── utils.test.ts         # Utility function tests
+│   ├── kv-storage.test.ts    # KV storage operation tests
+│   ├── target-processing.test.ts # Target processing logic tests
+│   ├── auth.test.ts          # Authentication middleware tests
+│   ├── target-endpoints.test.ts # Admin API endpoint tests
+│   ├── manual-run.test.ts    # Manual run endpoint tests
+│   ├── slack-notification.test.ts # Slack notification tests
+│   ├── change-detection.test.ts # Change detection tests
+│   └── routing.test.ts       # Request routing tests
 ├── wrangler.toml         # Cloudflare Worker configuration
 ├── package.json          # Node.js dependencies and scripts
 ├── tsconfig.json         # TypeScript configuration
@@ -69,11 +77,13 @@ This project is currently in active development. See `progress.md` for detailed 
 - ✅ Content fetching with proper headers and error handling
 - ✅ Change detection engine with material change filtering
 - ✅ Complete KV storage layer with target, state, and history management
+- ✅ Slack notification system with rich message formatting
 - ✅ Authentication middleware with constant-time token validation
 - ✅ Admin API target management endpoints (GET/POST /admin/targets)
-- ✅ Manual run endpoint (POST /admin/run) with target processing simulation
+- ✅ Manual run endpoint (POST /admin/run) with complete target processing
+- ✅ Core target processing logic with parallel batch processing
 - ✅ Comprehensive unit test coverage with 100% test coverage
 
 ### In Progress
-- 🔄 Slack notification system
-- 🔄 Core monitoring logic
+- 🔄 HTTP request routing and main worker entry point
+- 🔄 Cron trigger integration for scheduled monitoring

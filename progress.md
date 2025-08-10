@@ -5,6 +5,54 @@ Building a serverless Cloudflare Worker application that monitors Costco Travel 
 
 ## Recent Changes (Latest First)
 
+### 2025-01-08 - Core Target Processing Logic Implementation
+- **Completed**: Tasks 8.1 and 8.2 - Core monitoring logic with target processing
+- **Files Added**: 
+  - `src/target-processing.ts` - Complete target processing implementation
+- **Features Implemented**:
+  - **Single Target Processing**:
+    - `processTarget()` - Processes individual target URLs for promotional changes
+    - Complete workflow: fetch content → parse promotions → detect changes → send notifications → update state
+    - Comprehensive error handling with graceful degradation at each step
+    - Performance timing and detailed logging for debugging
+    - Historical snapshot storage for change tracking
+  - **Batch Target Processing**:
+    - `processBatchTargets()` - Processes all enabled targets in parallel
+    - Efficient parallel processing with proper error isolation
+    - Comprehensive statistics and summary generation
+    - Individual target result tracking with success/failure status
+    - Automatic filtering of enabled targets (enabled !== false)
+  - **Processing Results**:
+    - `TargetProcessingResult` interface for individual target results
+    - `BatchProcessingResult` interface for batch processing summaries
+    - Detailed error reporting and success metrics
+    - Processing duration tracking for performance monitoring
+  - **Integration Features**:
+    - Full integration with existing KV storage layer
+    - Slack notification sending for material changes
+    - State management with hash-based change detection
+    - Historical snapshot storage with automatic pruning
+    - Comprehensive logging for monitoring and debugging
+- **Technical Features**:
+  - Parallel processing with Promise.all for efficiency
+  - Error isolation prevents single target failures from affecting others
+  - Graceful degradation when notifications or state updates fail
+  - Comprehensive statistics generation for monitoring
+  - Memory-efficient processing with minimal resource usage
+- **Error Handling**:
+  - Network failure handling for content fetching
+  - HTML parsing error recovery with detailed error messages
+  - KV storage failure handling with graceful degradation
+  - Slack notification failure handling without stopping processing
+  - Comprehensive error logging for debugging and monitoring
+- **Performance Features**:
+  - Parallel target processing for optimal execution time
+  - Efficient KV operations with minimal read/write operations
+  - Processing duration tracking for performance monitoring
+  - Resource-efficient design for Cloudflare Workers environment
+- **Requirements Satisfied**: 1.3, 1.4, 6.1, 6.2, 6.3 (core monitoring logic, batch processing, error handling)
+- **Note**: This completes the core monitoring functionality. The processing logic is now ready for integration with the main worker entry point and cron triggers.
+
 ### 2025-01-08 - Manual Run Endpoint Implementation
 - **Completed**: Task 7.3 - Manual run endpoint (POST /admin/run)
 - **Files Enhanced**: 
@@ -227,22 +275,27 @@ Building a serverless Cloudflare Worker application that monitors Costco Travel 
 - [x] 5.1 Implement target configuration management
 - [x] 5.2 Build state management functions
 - [x] 5.3 Create historical snapshot management
+- [x] 6.1 Create Slack message formatter
+- [x] 6.2 Implement Slack webhook integration
 - [x] 7.1 Implement authentication middleware
 - [x] 7.2 Build target management endpoints
 - [x] 7.3 Create manual run endpoint
+- [x] 8.1 Build target processing function
+- [x] 8.2 Create batch processing for multiple targets
 
 ### 🔄 In Progress
-- [ ] 6.1 Create Slack message formatter
+- [ ] 9.1 Implement HTTP request router
 
 ### 📋 Next Steps
-1. **Slack Notification System** (Task 6.1)
-   - Create Slack message formatter for change results
-   - Include target name, URL, timestamp, and up to 3 changed items
-   - Create rich text formatting with proper markdown
+1. **Request Handlers and Routing** (Task 9.1)
+   - Write main request handler with route matching
+   - Add support for all admin endpoints and health check
+   - Implement proper HTTP status codes and error responses
 
-2. **Admin API Endpoints** (Task 7.3)
-   - Create manual run endpoint (POST /admin/run)
-   - Add request validation and error handling
+2. **Cron Trigger Handler** (Task 9.2)
+   - Write scheduled event handler that triggers batch processing
+   - Integrate with target processing and error handling
+   - Add execution logging and performance monitoring
 
 ## Technical Implementation
 

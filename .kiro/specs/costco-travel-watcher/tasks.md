@@ -112,20 +112,22 @@
     - _Requirements: 2.3, 4.4_
     - _Completed: 2025-01-08 - Implemented handleManualRun with authentication, target processing simulation, comprehensive error handling, and full test coverage. Endpoint ready for integration with actual monitoring logic in tasks 8.1-8.2._
 
-- [ ] 8. Implement core monitoring logic
-  - [ ] 8.1 Build target processing function
-    - Write function to process a single target URL
-    - Integrate content fetching, parsing, change detection, and notification
-    - Add comprehensive error handling for each step
-    - Write unit tests for complete target processing flow
+- [x] 8. Implement core monitoring logic
+  - [x] 8.1 Build target processing function
+    - ✅ Write function to process a single target URL
+    - ✅ Integrate content fetching, parsing, change detection, and notification
+    - ✅ Add comprehensive error handling for each step
+    - ✅ Write unit tests for complete target processing flow
     - _Requirements: 1.3, 6.1, 6.2, 6.3_
+    - _Completed: 2025-01-08 - Implemented processTarget() with complete workflow: fetch → parse → detect changes → notify → update state. Includes comprehensive error handling, performance timing, and historical snapshot storage._
 
-  - [ ] 8.2 Create batch processing for multiple targets
-    - Write function to process all enabled targets from configuration
-    - Implement parallel processing with proper error isolation
-    - Add logging for processing results and errors
-    - Write unit tests for batch processing scenarios
+  - [x] 8.2 Create batch processing for multiple targets
+    - ✅ Write function to process all enabled targets from configuration
+    - ✅ Implement parallel processing with proper error isolation
+    - ✅ Add logging for processing results and errors
+    - ✅ Write unit tests for batch processing scenarios
     - _Requirements: 1.3, 1.4, 6.1_
+    - _Completed: 2025-01-08 - Implemented processBatchTargets() with parallel processing, error isolation, comprehensive statistics, and detailed logging. Includes TargetProcessingResult and BatchProcessingResult interfaces for structured results._
 
 - [ ] 9. Build request handlers and routing
   - [ ] 9.1 Implement HTTP request router

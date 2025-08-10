@@ -445,7 +445,7 @@ describe('Authentication Middleware', () => {
       const errorResponse = createAuthErrorResponse(authResult);
       expect(errorResponse.status).toBe(401);
       
-      const body = await errorResponse.json();
+      const body = await errorResponse.json() as any;
       expect(body.error).toBe('Invalid authorization token');
     });
 
@@ -465,7 +465,7 @@ describe('Authentication Middleware', () => {
       const errorResponse = createAuthErrorResponse(authResult);
       expect(errorResponse.status).toBe(401);
       
-      const body = await errorResponse.json();
+      const body = await errorResponse.json() as any;
       expect(body.error).toBe('Missing authorization token');
     });
   });

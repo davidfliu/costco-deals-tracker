@@ -632,7 +632,7 @@ function isMaterialPromotion(promotion: Promotion): boolean {
 
   // If we have basic content and no noise patterns, consider it material
   // Prefer promotions with specific content (price/dates)
-  return hasBasicContent && (hasSpecificContent || hasPerk);
+  return hasBasicContent && (hasSpecificContent || !!hasPerk);
 }
 
 /**
@@ -847,7 +847,7 @@ interface SlackText {
 
 interface SlackElement {
   type: string;
-  text?: SlackText;
+  text?: string;
   url?: string;
 }
 
