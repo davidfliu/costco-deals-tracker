@@ -18,6 +18,12 @@ import {
   storeAndPruneSnapshot,
   readTargets 
 } from "./kv-storage";
+import { 
+  OptimizedStateManager, 
+  OptimizedTextProcessor, 
+  PerformanceMonitor,
+  RequestOptimizer 
+} from "./performance";
 
 /**
  * Result of processing a single target
@@ -199,19 +205,24 @@ export async function processTarget(env: Env, target: Target): Promise<TargetPro
 }
 
 /**
- * Processes all enabled targets from configuration in parallel
+ * Processes all enabled targets from configuration in parallel with performance optimizations
  * 
  * @param env - Environment variables containing KV namespace and secrets
  * @returns Batch processing result with summary statistics
  */
 export async function processBatchTargets(env: Env): Promise<BatchProcessingResult> {
   const startTime = Date.now();
+  const monitor = new PerformanceMonitor();
+  
+  monitor.startTimer('batch-processing');
   
   try {
     // Step 1: Read targets configuration
     let targets: Target[];
     try {
+      monitor.startTimer('read-targets');
       targets = await readTargets(env);
+      monitor.endTimer('read-targets');
     } catch (error) {
       return {
         totalTargets: 0,
@@ -244,6 +255,7 @@ export async function processBatchTargets(env: Env): Promise<BatchProcessingResu
     console.log(`Processing ${enabledTargets.length} enabled targets`);
 
     // Step 3: Process all targets in parallel with error isolation
+    monitor.startTimer('process-targets');
     const processingPromises = enabledTargets.map(target => 
       processTarget(env, target).catch(error => ({
         target,
@@ -254,6 +266,7 @@ export async function processBatchTargets(env: Env): Promise<BatchProcessingResu
     );
 
     const results = await Promise.all(processingPromises);
+    monitor.endTimer('process-targets');
 
     // Step 4: Calculate summary statistics
     const totalTargets = results.length;
@@ -261,7 +274,7 @@ export async function processBatchTargets(env: Env): Promise<BatchProcessingResu
     const failedTargets = results.filter(r => !r.success).length;
     const targetsWithChanges = results.filter(r => r.success && r.changes?.hasChanges).length;
     const notificationsSent = results.filter(r => r.notificationSent).length;
-    const totalDuration = Date.now() - startTime;
+    const batchDuration = monitor.endTimer('batch-processing');
 
     // Step 5: Generate summary message
     const summary = generateBatchSummary(
@@ -272,7 +285,13 @@ export async function processBatchTargets(env: Env): Promise<BatchProcessingResu
       notificationsSent
     );
 
-    // Step 6: Log results
+    // Step 6: Log performance metrics (only in development/debug mode)
+    if (process.env.NODE_ENV !== 'production') {
+      const perfStats = monitor.getStats();
+      console.log('Performance metrics:', perfStats);
+    }
+
+    // Step 7: Log results
     console.log(`Batch processing completed: ${summary}`);
     
     // Log individual failures for debugging
@@ -292,7 +311,7 @@ export async function processBatchTargets(env: Env): Promise<BatchProcessingResu
       targetsWithChanges,
       notificationsSent,
       results,
-      totalDuration,
+      totalDuration: batchDuration,
       summary
     };
 
@@ -306,6 +325,134 @@ export async function processBatchTargets(env: Env): Promise<BatchProcessingResu
       results: [],
       totalDuration: Date.now() - startTime,
       summary: `Batch processing failed: ${error instanceof Error ? error.message : String(error)}`
+    };
+  }
+}
+
+/**
+ * Optimized version of processTarget that uses performance optimizations
+ * 
+ * @param env - Environment variables containing KV namespace and secrets
+ * @param target - Target configuration to process
+ * @param previousState - Pre-loaded previous state (null if not found)
+ * @param textProcessor - Optimized text processor with caching
+ * @returns Processing result with success status and change information
+ */
+async function processTargetOptimized(
+  env: Env, 
+  target: Target, 
+  previousState: TargetState | null,
+  textProcessor: OptimizedTextProcessor
+): Promise<TargetProcessingResult> {
+  const startTime = Date.now();
+  
+  try {
+    console.log(`Processing target: ${target.name || target.url}`);
+    
+    // Step 1: Fetch HTML content with optimized request
+    let htmlContent: string;
+    try {
+      const response = await RequestOptimizer.optimizedFetch(target.url);
+      htmlContent = await response.text();
+    } catch (error) {
+      return {
+        target,
+        success: false,
+        error: `Failed to fetch content: ${error instanceof Error ? error.message : String(error)}`,
+        duration: Date.now() - startTime
+      };
+    }
+
+    // Step 2: Parse promotions from HTML content
+    let currentPromotions: Promotion[];
+    try {
+      currentPromotions = await parsePromotions(htmlContent, target.selector);
+    } catch (error) {
+      return {
+        target,
+        success: false,
+        error: `Failed to parse promotions: ${error instanceof Error ? error.message : String(error)}`,
+        duration: Date.now() - startTime
+      };
+    }
+
+    // Step 3: Generate hash using optimized text processor
+    const currentHash = await textProcessor.hashString(JSON.stringify(currentPromotions));
+    const currentTimestamp = new Date().toISOString();
+    
+    const currentState: TargetState = {
+      hash: currentHash,
+      promos: currentPromotions,
+      lastSeenISO: currentTimestamp
+    };
+
+    // Step 4: Detect changes using pre-loaded previous state
+    let changes: ChangeResult;
+    if (previousState) {
+      const rawChanges = detectChanges(currentPromotions, previousState.promos);
+      changes = filterMaterialChanges(rawChanges);
+    } else {
+      // First time processing this target - no changes to report
+      changes = {
+        hasChanges: false,
+        added: [],
+        removed: [],
+        changed: [],
+        summary: 'Initial state captured'
+      };
+    }
+
+    // Step 5: Send Slack notification if material changes detected
+    let notificationSent = false;
+    if (changes.hasChanges && env.SLACK_WEBHOOK) {
+      try {
+        const message = formatSlackMessage(
+          target.name || 'Costco Travel Deal',
+          target.url,
+          changes,
+          currentTimestamp
+        );
+        
+        await sendSlackNotification(env.SLACK_WEBHOOK, message);
+        notificationSent = true;
+        console.log(`Notification sent for ${target.name || target.url}: ${changes.summary}`);
+      } catch (error) {
+        console.error(`Failed to send notification for ${target.url}: ${error}`);
+        // Don't fail the entire processing if notification fails
+      }
+    }
+
+    // Step 6: Store historical snapshot if changes detected (will be batched later)
+    if (changes.hasChanges) {
+      try {
+        const snapshot: HistoricalSnapshot = {
+          promos: currentPromotions,
+          hash: currentHash,
+          timestamp: currentTimestamp
+        };
+        
+        await storeAndPruneSnapshot(env, target.url, snapshot);
+      } catch (error) {
+        console.error(`Failed to store historical snapshot for ${target.url}: ${error}`);
+        // Don't fail processing if snapshot storage fails
+      }
+    }
+
+    return {
+      target,
+      success: true,
+      changes,
+      notificationSent,
+      currentPromotions,
+      duration: Date.now() - startTime
+    };
+
+  } catch (error) {
+    return {
+      target,
+      success: false,
+      error: `Unexpected error: ${error instanceof Error ? error.message : String(error)}`,
+      duration: Date.now() - startTime
     };
   }
 }

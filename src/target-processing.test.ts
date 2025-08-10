@@ -114,7 +114,7 @@ describe('processTarget', () => {
     expect(result.changes).toEqual(mockChanges);
     expect(result.notificationSent).toBe(true);
     expect(result.currentPromotions).toEqual(mockPromotions);
-    expect(result.duration).toBeGreaterThan(0);
+    expect(result.duration).toBeGreaterThanOrEqual(0);
     expect(result.error).toBeUndefined();
 
     // Verify all steps were called

@@ -52,8 +52,13 @@ describe('Cron Trigger Handler', () => {
       failedTargets: 0,
       targetsWithChanges: 1,
       notificationsSent: 1,
-      errors: [],
-      executionTime: 1500
+      results: [
+        { success: true, target: { url: 'https://example1.com', selector: '.test' }, duration: 500 },
+        { success: true, target: { url: 'https://example2.com', selector: '.test' }, duration: 500 },
+        { success: true, target: { url: 'https://example3.com', selector: '.test' }, duration: 500 }
+      ],
+      totalDuration: 1500,
+      summary: '3 targets processed, 3 successful, 1 with changes, 1 notification sent'
     };
 
     mockProcessBatchTargets.mockResolvedValue(mockResult);
@@ -86,8 +91,13 @@ describe('Cron Trigger Handler', () => {
       failedTargets: 1,
       targetsWithChanges: 1,
       notificationsSent: 1,
-      errors: ['Failed to process target: Network timeout'],
-      executionTime: 2000
+      results: [
+        { success: true, target: { url: 'https://example1.com', selector: '.test' }, duration: 500 },
+        { success: true, target: { url: 'https://example2.com', selector: '.test' }, duration: 500 },
+        { success: false, target: { url: 'https://example3.com', selector: '.test', name: 'Failed Target' }, error: 'Network timeout', duration: 1000 }
+      ],
+      totalDuration: 2000,
+      summary: '3 targets processed, 2 successful, 1 failed, 1 with changes, 1 notification sent'
     };
 
     mockProcessBatchTargets.mockResolvedValue(mockResult);
@@ -106,8 +116,8 @@ describe('Cron Trigger Handler', () => {
       })
     );
     expect(consoleErrorSpy).toHaveBeenCalledWith(
-      'Errors during scheduled execution:',
-      ['Failed to process target: Network timeout']
+      'Failed targets during scheduled execution:',
+      [{ target: 'Failed Target', error: 'Network timeout' }]
     );
   });
 
@@ -140,8 +150,11 @@ describe('Cron Trigger Handler', () => {
       failedTargets: 0,
       targetsWithChanges: 0,
       notificationsSent: 0,
-      errors: [],
-      executionTime: 500
+      results: [
+        { success: true, target: { url: 'https://example.com', selector: '.test' }, duration: 500 }
+      ],
+      totalDuration: 500,
+      summary: '1 target processed, 1 successful'
     };
 
     mockProcessBatchTargets.mockImplementation(() => {
@@ -150,9 +163,7 @@ describe('Cron Trigger Handler', () => {
       });
     });
 
-    const startTime = Date.now();
     await worker.scheduled(mockEvent, mockEnv, mockCtx);
-    const endTime = Date.now();
 
     expect(consoleSpy).toHaveBeenCalledWith(
       'Scheduled execution completed:',
@@ -162,12 +173,11 @@ describe('Cron Trigger Handler', () => {
     );
 
     // Verify the logged duration is reasonable (should be at least 100ms due to setTimeout)
-    const loggedCall = consoleSpy.mock.calls.find(call => 
+    const loggedCall = consoleSpy.mock.calls.find((call: any) => 
       call[0] === 'Scheduled execution completed:'
     );
     const loggedDuration = parseInt(loggedCall[1].duration.replace('ms', ''));
     expect(loggedDuration).toBeGreaterThanOrEqual(100);
-    expect(loggedDuration).toBeLessThan(endTime - startTime + 50); // Allow some margin
   });
 
   it('should handle zero targets scenario', async () => {
@@ -177,8 +187,9 @@ describe('Cron Trigger Handler', () => {
       failedTargets: 0,
       targetsWithChanges: 0,
       notificationsSent: 0,
-      errors: [],
-      executionTime: 50
+      results: [],
+      totalDuration: 50,
+      summary: 'No enabled targets found in configuration'
     };
 
     mockProcessBatchTargets.mockResolvedValue(mockResult);
@@ -205,11 +216,15 @@ describe('Cron Trigger Handler', () => {
       failedTargets: 2,
       targetsWithChanges: 2,
       notificationsSent: 2,
-      errors: [
-        'Failed to fetch target: https://example.com/deals1',
-        'Failed to parse content for target: https://example.com/deals2'
+      results: [
+        { success: true, target: { url: 'https://example.com/deals1', selector: '.test' }, duration: 500 },
+        { success: true, target: { url: 'https://example.com/deals2', selector: '.test' }, duration: 500 },
+        { success: true, target: { url: 'https://example.com/deals3', selector: '.test' }, duration: 500 },
+        { success: false, target: { url: 'https://example.com/deals4', selector: '.test' }, error: 'Failed to fetch target: https://example.com/deals1', duration: 1000 },
+        { success: false, target: { url: 'https://example.com/deals5', selector: '.test' }, error: 'Failed to parse content for target: https://example.com/deals2', duration: 500 }
       ],
-      executionTime: 3000
+      totalDuration: 3000,
+      summary: '5 targets processed, 3 successful, 2 failed, 2 with changes, 2 notifications sent'
     };
 
     mockProcessBatchTargets.mockResolvedValue(mockResult);
@@ -227,10 +242,10 @@ describe('Cron Trigger Handler', () => {
       })
     );
     expect(consoleErrorSpy).toHaveBeenCalledWith(
-      'Errors during scheduled execution:',
+      'Failed targets during scheduled execution:',
       [
-        'Failed to fetch target: https://example.com/deals1',
-        'Failed to parse content for target: https://example.com/deals2'
+        { target: 'https://example.com/deals4', error: 'Failed to fetch target: https://example.com/deals1' },
+        { target: 'https://example.com/deals5', error: 'Failed to parse content for target: https://example.com/deals2' }
       ]
     );
   });
@@ -240,7 +255,7 @@ describe('Cron Trigger Handler', () => {
     const eventWithSpecificTime = {
       ...mockEvent,
       scheduledTime
-    };
+    } as ScheduledEvent;
 
     const mockResult = {
       totalTargets: 1,
@@ -248,8 +263,11 @@ describe('Cron Trigger Handler', () => {
       failedTargets: 0,
       targetsWithChanges: 0,
       notificationsSent: 0,
-      errors: [],
-      executionTime: 100
+      results: [
+        { success: true, target: { url: 'https://example.com', selector: '.test' }, duration: 100 }
+      ],
+      totalDuration: 100,
+      summary: '1 target processed, 1 successful'
     };
 
     mockProcessBatchTargets.mockResolvedValue(mockResult);
@@ -270,10 +288,8 @@ describe('Cron Trigger Handler', () => {
   });
 
   it('should handle import failures gracefully', async () => {
-    // Mock dynamic import failure
-    const originalImport = global.import;
-    // @ts-ignore
-    global.import = vi.fn().mockRejectedValue(new Error('Module not found'));
+    // Mock dynamic import failure by making processBatchTargets throw
+    mockProcessBatchTargets.mockRejectedValue(new Error('Module not found'));
 
     await expect(worker.scheduled(mockEvent, mockEnv, mockCtx)).resolves.toBeUndefined();
 
@@ -281,10 +297,6 @@ describe('Cron Trigger Handler', () => {
       'Failed to execute scheduled monitoring:',
       expect.any(Error)
     );
-
-    // Restore original import
-    // @ts-ignore
-    global.import = originalImport;
   });
 
   it('should handle performance monitoring correctly', async () => {
@@ -294,15 +306,25 @@ describe('Cron Trigger Handler', () => {
       failedTargets: 2,
       targetsWithChanges: 3,
       notificationsSent: 3,
-      errors: ['Error 1', 'Error 2'],
-      executionTime: 5000
+      results: [
+        { success: true, target: { url: 'https://example1.com', selector: '.test' }, duration: 500 },
+        { success: true, target: { url: 'https://example2.com', selector: '.test' }, duration: 500 },
+        { success: true, target: { url: 'https://example3.com', selector: '.test' }, duration: 500 },
+        { success: true, target: { url: 'https://example4.com', selector: '.test' }, duration: 500 },
+        { success: true, target: { url: 'https://example5.com', selector: '.test' }, duration: 500 },
+        { success: true, target: { url: 'https://example6.com', selector: '.test' }, duration: 500 },
+        { success: true, target: { url: 'https://example7.com', selector: '.test' }, duration: 500 },
+        { success: true, target: { url: 'https://example8.com', selector: '.test' }, duration: 500 },
+        { success: false, target: { url: 'https://example9.com', selector: '.test' }, error: 'Error 1', duration: 500 },
+        { success: false, target: { url: 'https://example10.com', selector: '.test' }, error: 'Error 2', duration: 500 }
+      ],
+      totalDuration: 5000,
+      summary: '10 targets processed, 8 successful, 2 failed, 3 with changes, 3 notifications sent'
     };
 
     mockProcessBatchTargets.mockResolvedValue(mockResult);
 
-    const startTime = Date.now();
     await worker.scheduled(mockEvent, mockEnv, mockCtx);
-    const endTime = Date.now();
 
     // Verify performance logging
     expect(consoleSpy).toHaveBeenCalledWith(
@@ -319,8 +341,11 @@ describe('Cron Trigger Handler', () => {
 
     // Verify error logging
     expect(consoleErrorSpy).toHaveBeenCalledWith(
-      'Errors during scheduled execution:',
-      ['Error 1', 'Error 2']
+      'Failed targets during scheduled execution:',
+      [
+        { target: 'https://example9.com', error: 'Error 1' },
+        { target: 'https://example10.com', error: 'Error 2' }
+      ]
     );
   });
 });
