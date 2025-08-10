@@ -69,6 +69,7 @@ This project is currently in active development. See `progress.md` for detailed 
 - ✅ Content fetching with proper headers and error handling
 - ✅ Change detection engine with material change filtering
 - ✅ Complete KV storage layer with target, state, and history management
+- ✅ Authentication middleware with constant-time token validation
 - ✅ Comprehensive unit test coverage with 100% test coverage
 
 ### In Progress

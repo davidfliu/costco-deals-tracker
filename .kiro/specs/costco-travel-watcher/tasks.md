@@ -76,25 +76,26 @@
     - _Completed: 2025-01-08 - Implemented validateHistoricalSnapshot, storeHistoricalSnapshot, getHistoricalSnapshots, pruneHistoricalSnapshots, storeAndPruneSnapshot, deleteAllHistoricalSnapshots with automatic cleanup_
 
 - [ ] 6. Build Slack notification system
-  - [ ] 6.1 Create Slack message formatter
+  - [x] 6.1 Create Slack message formatter
     - Write function to format change results into Slack block format
     - Include target name, URL, timestamp, and up to 3 changed items
     - Create rich text formatting with proper markdown
     - Write unit tests for message formatting with various change types
     - _Requirements: 3.3, 3.5_
 
-  - [ ] 6.2 Implement Slack webhook integration
+  - [x] 6.2 Implement Slack webhook integration
     - Write function to send formatted messages to Slack webhook
     - Add error handling for webhook failures and rate limiting
     - Write unit tests with mock webhook responses
     - _Requirements: 3.3, 6.4_
 
-- [ ] 7. Create admin API endpoints
-  - [ ] 7.1 Implement authentication middleware
-    - Write token validation function using constant-time comparison
-    - Create middleware to protect admin endpoints
-    - Write unit tests for authentication success and failure cases
+- [-] 7. Create admin API endpoints
+  - [x] 7.1 Implement authentication middleware
+    - ✅ Write token validation function using constant-time comparison
+    - ✅ Create middleware to protect admin endpoints
+    - ✅ Write unit tests for authentication success and failure cases
     - _Requirements: 4.1, 4.5_
+    - _Completed: 2025-01-08 - Implemented validateAdminToken, extractAuthToken, authenticateAdminRequest, createAuthErrorResponse with constant-time comparison and comprehensive security testing_
 
   - [ ] 7.2 Build target management endpoints
     - Implement POST /admin/targets endpoint to update target configuration

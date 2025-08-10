@@ -826,6 +826,538 @@ function calculateTextSimilarity(str1: string, str2: string): number {
 }
 
 /**
+ * Slack block kit message structure for rich formatting
+ */
+interface SlackMessage {
+  blocks: SlackBlock[];
+}
+
+interface SlackBlock {
+  type: string;
+  text?: SlackText;
+  elements?: SlackElement[];
+  fields?: SlackText[];
+}
+
+interface SlackText {
+  type: 'plain_text' | 'mrkdwn';
+  text: string;
+  emoji?: boolean;
+}
+
+interface SlackElement {
+  type: string;
+  text?: SlackText;
+  url?: string;
+}
+
+/**
+ * Formats change results into Slack block format with rich formatting
+ * 
+ * @param targetName - Name of the target being monitored
+ * @param targetUrl - URL of the target
+ * @param changeResult - Change detection results
+ * @param timestamp - ISO timestamp of when changes were detected
+ * @returns Slack message object with blocks
+ */
+export function formatSlackMessage(
+  targetName: string,
+  targetUrl: string,
+  changeResult: ChangeResult,
+  timestamp: string
+): SlackMessage {
+  const blocks: SlackBlock[] = [];
+
+  // Header block with target name and summary
+  blocks.push({
+    type: 'header',
+    text: {
+      type: 'plain_text',
+      text: `🎯 ${targetName || 'Costco Travel Deal'}`,
+      emoji: true
+    }
+  });
+
+  // Context block with URL and timestamp
+  blocks.push({
+    type: 'context',
+    elements: [
+      {
+        type: 'mrkdwn',
+        text: `<${targetUrl}|View Page> • ${formatTimestamp(timestamp)}`
+      }
+    ]
+  });
+
+  // Summary block
+  blocks.push({
+    type: 'section',
+    text: {
+      type: 'mrkdwn',
+      text: `*Changes detected:* ${changeResult.summary}`
+    }
+  });
+
+  // Add divider before details
+  blocks.push({ type: 'divider' });
+
+  // Add details for each type of change (limit to 3 items total)
+  let itemCount = 0;
+  const maxItems = 3;
+
+  // Added promotions
+  if (changeResult.added.length > 0 && itemCount < maxItems) {
+    const itemsToShow = changeResult.added.slice(0, maxItems - itemCount);
+    blocks.push({
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `*🆕 New Promotions (${changeResult.added.length}):*`
+      }
+    });
+
+    for (const promo of itemsToShow) {
+      blocks.push({
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: formatPromotionForSlack(promo)
+        }
+      });
+      itemCount++;
+    }
+
+    if (changeResult.added.length > itemsToShow.length) {
+      blocks.push({
+        type: 'context',
+        elements: [
+          {
+            type: 'mrkdwn',
+            text: `_... and ${changeResult.added.length - itemsToShow.length} more new promotions_`
+          }
+        ]
+      });
+    }
+  }
+
+  // Changed promotions
+  if (changeResult.changed.length > 0 && itemCount < maxItems) {
+    const itemsToShow = changeResult.changed.slice(0, maxItems - itemCount);
+    blocks.push({
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `*🔄 Updated Promotions (${changeResult.changed.length}):*`
+      }
+    });
+
+    for (const change of itemsToShow) {
+      blocks.push({
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: formatPromotionChangeForSlack(change.previous, change.current)
+        }
+      });
+      itemCount++;
+    }
+
+    if (changeResult.changed.length > itemsToShow.length) {
+      blocks.push({
+        type: 'context',
+        elements: [
+          {
+            type: 'mrkdwn',
+            text: `_... and ${changeResult.changed.length - itemsToShow.length} more updated promotions_`
+          }
+        ]
+      });
+    }
+  }
+
+  // Removed promotions
+  if (changeResult.removed.length > 0 && itemCount < maxItems) {
+    const itemsToShow = changeResult.removed.slice(0, maxItems - itemCount);
+    blocks.push({
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `*❌ Removed Promotions (${changeResult.removed.length}):*`
+      }
+    });
+
+    for (const promo of itemsToShow) {
+      blocks.push({
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: formatPromotionForSlack(promo)
+        }
+      });
+      itemCount++;
+    }
+
+    if (changeResult.removed.length > itemsToShow.length) {
+      blocks.push({
+        type: 'context',
+        elements: [
+          {
+            type: 'mrkdwn',
+            text: `_... and ${changeResult.removed.length - itemsToShow.length} more removed promotions_`
+          }
+        ]
+      });
+    }
+  }
+
+  return { blocks };
+}
+
+/**
+ * Formats a single promotion for display in Slack
+ * 
+ * @param promotion - Promotion to format
+ * @returns Formatted markdown string
+ */
+function formatPromotionForSlack(promotion: Promotion): string {
+  const parts: string[] = [];
+
+  // Title (bold)
+  if (promotion.title) {
+    parts.push(`*${escapeSlackMarkdown(promotion.title)}*`);
+  }
+
+  // Perk/benefit
+  if (promotion.perk) {
+    parts.push(escapeSlackMarkdown(promotion.perk));
+  }
+
+  // Price (if available)
+  if (promotion.price) {
+    parts.push(`💰 ${escapeSlackMarkdown(promotion.price)}`);
+  }
+
+  // Dates (if available)
+  if (promotion.dates) {
+    parts.push(`📅 ${escapeSlackMarkdown(promotion.dates)}`);
+  }
+
+  return parts.join('\n');
+}
+
+/**
+ * Formats a promotion change for display in Slack, highlighting differences
+ * 
+ * @param previous - Previous version of promotion
+ * @param current - Current version of promotion
+ * @returns Formatted markdown string showing changes
+ */
+function formatPromotionChangeForSlack(previous: Promotion, current: Promotion): string {
+  const parts: string[] = [];
+
+  // Title
+  if (previous.title !== current.title) {
+    if (current.title) {
+      parts.push(`*${escapeSlackMarkdown(current.title)}*`);
+    }
+    if (previous.title && previous.title !== current.title) {
+      parts.push(`~${escapeSlackMarkdown(previous.title)}~`);
+    }
+  } else if (current.title) {
+    parts.push(`*${escapeSlackMarkdown(current.title)}*`);
+  }
+
+  // Perk changes
+  if (previous.perk !== current.perk) {
+    if (current.perk) {
+      parts.push(`${escapeSlackMarkdown(current.perk)}`);
+    }
+    if (previous.perk && previous.perk !== current.perk) {
+      parts.push(`~${escapeSlackMarkdown(previous.perk)}~`);
+    }
+  } else if (current.perk) {
+    parts.push(escapeSlackMarkdown(current.perk));
+  }
+
+  // Price changes
+  if (previous.price !== current.price) {
+    if (current.price) {
+      parts.push(`💰 ${escapeSlackMarkdown(current.price)}`);
+    }
+    if (previous.price && previous.price !== current.price) {
+      parts.push(`💰 ~${escapeSlackMarkdown(previous.price)}~`);
+    }
+  } else if (current.price) {
+    parts.push(`💰 ${escapeSlackMarkdown(current.price)}`);
+  }
+
+  // Date changes
+  if (previous.dates !== current.dates) {
+    if (current.dates) {
+      parts.push(`📅 ${escapeSlackMarkdown(current.dates)}`);
+    }
+    if (previous.dates && previous.dates !== current.dates) {
+      parts.push(`📅 ~${escapeSlackMarkdown(previous.dates)}~`);
+    }
+  } else if (current.dates) {
+    parts.push(`📅 ${escapeSlackMarkdown(current.dates)}`);
+  }
+
+  return parts.join('\n');
+}
+
+/**
+ * Escapes special characters in text for Slack markdown
+ * 
+ * @param text - Text to escape
+ * @returns Escaped text safe for Slack markdown
+ */
+function escapeSlackMarkdown(text: string): string {
+  if (!text) return '';
+  
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\*/g, '\\*')
+    .replace(/_/g, '\\_')
+    .replace(/~/g, '\\~')
+    .replace(/`/g, '\\`');
+}
+
+/**
+ * Formats an ISO timestamp for display in Slack
+ * 
+ * @param isoTimestamp - ISO timestamp string
+ * @returns Formatted timestamp string
+ */
+function formatTimestamp(isoTimestamp: string): string {
+  try {
+    const date = new Date(isoTimestamp);
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      return isoTimestamp;
+    }
+    
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMinutes / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMinutes < 1) {
+      return 'just now';
+    } else if (diffMinutes < 60) {
+      return `${diffMinutes} minute${diffMinutes === 1 ? '' : 's'} ago`;
+    } else if (diffHours < 24) {
+      return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
+    } else if (diffDays < 7) {
+      return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
+    } else {
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit'
+      });
+    }
+  } catch (error) {
+    return isoTimestamp;
+  }
+}
+
+/**
+ * Sends a formatted message to Slack webhook
+ * 
+ * @param webhookUrl - Slack webhook URL
+ * @param message - Slack message object with blocks
+ * @param timeoutMs - Request timeout in milliseconds (default: 10000)
+ * @returns Response from Slack webhook
+ * @throws Error if webhook request fails
+ */
+export async function sendSlackNotification(
+  webhookUrl: string,
+  message: SlackMessage,
+  timeoutMs: number = 10000
+): Promise<Response> {
+  // Validate webhook URL
+  if (!webhookUrl || !webhookUrl.startsWith('https://hooks.slack.com/')) {
+    throw new Error('Invalid Slack webhook URL');
+  }
+
+  // Validate message structure
+  if (!message.blocks || message.blocks.length === 0) {
+    throw new Error('Message must contain at least one block');
+  }
+
+  // Create abort controller for timeout handling
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'CostcoTravelWatcher/1.0'
+      },
+      body: JSON.stringify(message),
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    // Slack webhooks return 200 for success, anything else is an error
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => 'Unknown error');
+      throw new Error(`Slack webhook failed: HTTP ${response.status} - ${errorText}`);
+    }
+
+    return response;
+
+  } catch (error) {
+    clearTimeout(timeoutId);
+
+    if (error instanceof Error) {
+      if (error.name === 'AbortError' || error.message === 'AbortError') {
+        throw new Error(`Slack webhook timeout after ${timeoutMs}ms`);
+      }
+      throw error;
+    }
+
+    throw new Error(`Slack webhook request failed: ${String(error)}`);
+  }
+}
+
+/**
+ * Authentication result for admin API requests
+ */
+export interface AuthResult {
+  /** Whether authentication was successful */
+  authenticated: boolean;
+  /** Error message if authentication failed */
+  error?: string;
+}
+
+/**
+ * Validates admin token using constant-time comparison to prevent timing attacks
+ * 
+ * @param providedToken - Token provided in the request
+ * @param validToken - Valid admin token from environment
+ * @returns Authentication result
+ */
+export function validateAdminToken(providedToken: string | null, validToken: string): AuthResult {
+  // Check if token is provided and not empty
+  if (!providedToken || providedToken.trim() === '') {
+    return {
+      authenticated: false,
+      error: 'Missing authorization token'
+    };
+  }
+
+  // Check if valid token is configured
+  if (!validToken) {
+    return {
+      authenticated: false,
+      error: 'Admin token not configured'
+    };
+  }
+
+  // Use constant-time comparison to prevent timing attacks
+  if (!constantTimeEquals(providedToken, validToken)) {
+    return {
+      authenticated: false,
+      error: 'Invalid authorization token'
+    };
+  }
+
+  return {
+    authenticated: true
+  };
+}
+
+/**
+ * Performs constant-time string comparison to prevent timing attacks
+ * 
+ * @param a - First string to compare
+ * @param b - Second string to compare
+ * @returns True if strings are equal
+ */
+function constantTimeEquals(a: string, b: string): boolean {
+  // If lengths differ, still perform comparison to maintain constant time
+  const aLength = a.length;
+  const bLength = b.length;
+  const maxLength = Math.max(aLength, bLength);
+  
+  let result = aLength === bLength ? 0 : 1;
+  
+  for (let i = 0; i < maxLength; i++) {
+    const aChar = i < aLength ? a.charCodeAt(i) : 0;
+    const bChar = i < bLength ? b.charCodeAt(i) : 0;
+    result |= aChar ^ bChar;
+  }
+  
+  return result === 0;
+}
+
+/**
+ * Extracts authorization token from request headers
+ * 
+ * @param request - HTTP request object
+ * @returns Authorization token or null if not found
+ */
+export function extractAuthToken(request: Request): string | null {
+  const authHeader = request.headers.get('Authorization');
+  
+  if (!authHeader || authHeader.trim() === '') {
+    return null;
+  }
+  
+  // Support both "Bearer <token>" and "<token>" formats
+  if (authHeader.startsWith('Bearer ')) {
+    const token = authHeader.substring(7).trim();
+    return token || null; // Return null if token is empty after "Bearer "
+  }
+  
+  return authHeader;
+}
+
+/**
+ * Middleware function to authenticate admin API requests
+ * 
+ * @param request - HTTP request object
+ * @param adminToken - Valid admin token from environment
+ * @returns Authentication result
+ */
+export function authenticateAdminRequest(request: Request, adminToken: string): AuthResult {
+  const providedToken = extractAuthToken(request);
+  return validateAdminToken(providedToken, adminToken);
+}
+
+/**
+ * Creates an HTTP response for authentication failures
+ * 
+ * @param authResult - Failed authentication result
+ * @returns HTTP response with 401 status
+ */
+export function createAuthErrorResponse(authResult: AuthResult): Response {
+  return new Response(
+    JSON.stringify({
+      error: authResult.error || 'Authentication failed',
+      code: 'UNAUTHORIZED'
+    }),
+    {
+      status: 401,
+      headers: {
+        'Content-Type': 'application/json',
+        'WWW-Authenticate': 'Bearer'
+      }
+    }
+  );
+}
+
+/**
  * Fetches HTML content from a URL with proper headers and error handling
  * 
  * @param url - URL to fetch
