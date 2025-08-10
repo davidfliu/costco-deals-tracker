@@ -210,16 +210,19 @@ describe('Worker Integration Tests', () => {
         totalDuration: 1500,
         summary: '2 targets processed, 2 successful, 1 with changes, 1 notification sent',
         results: [
-          { success: true, target: { url: 'https://example1.com', selector: '.test' } },
-          { success: true, target: { url: 'https://example2.com', selector: '.test' } }
+          { success: true, target: { url: 'https://example1.com', selector: '.test' }, duration: 750 },
+          { success: true, target: { url: 'https://example2.com', selector: '.test' }, duration: 750 }
         ]
       };
       vi.mocked(processBatchTargets).mockResolvedValue(mockResult);
 
       const mockEvent = {
         scheduledTime: Date.now(),
-        cron: '0 */3 * * *'
-      } as ScheduledEvent;
+        cron: '0 */3 * * *',
+        type: 'scheduled',
+        waitUntil: vi.fn(),
+        passThroughOnException: vi.fn()
+      } as any;
 
       const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
@@ -255,11 +258,12 @@ describe('Worker Integration Tests', () => {
         totalDuration: 2000,
         summary: '2 targets processed, 1 successful, 1 failed',
         results: [
-          { success: true, target: { url: 'https://example1.com', selector: '.test' } },
+          { success: true, target: { url: 'https://example1.com', selector: '.test' }, duration: 1000 },
           { 
             success: false, 
             target: { url: 'https://example2.com', selector: '.test', name: 'Failed Target' },
-            error: 'Network timeout'
+            error: 'Network timeout',
+            duration: 1000
           }
         ]
       };
@@ -292,8 +296,11 @@ describe('Worker Integration Tests', () => {
 
       const mockEvent = {
         scheduledTime: Date.now(),
-        cron: '0 */3 * * *'
-      } as ScheduledEvent;
+        cron: '0 */3 * * *',
+        type: 'scheduled',
+        waitUntil: vi.fn(),
+        passThroughOnException: vi.fn()
+      } as any;
 
       const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -341,15 +348,18 @@ describe('Worker Integration Tests', () => {
         totalDuration: 500,
         summary: '1 target processed, 1 successful',
         results: [
-          { success: true, target: { url: 'https://example.com', selector: '.test' } }
+          { success: true, target: { url: 'https://example.com', selector: '.test' }, duration: 500 }
         ]
       };
       vi.mocked(processBatchTargets).mockResolvedValue(mockResult);
 
       const mockEvent = {
         scheduledTime: Date.now(),
-        cron: '0 */3 * * *'
-      } as ScheduledEvent;
+        cron: '0 */3 * * *',
+        type: 'scheduled',
+        waitUntil: vi.fn(),
+        passThroughOnException: vi.fn()
+      } as any;
 
       const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 

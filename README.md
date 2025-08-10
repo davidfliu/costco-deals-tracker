@@ -54,16 +54,45 @@ A serverless monitoring system that tracks promotional changes on Costco Travel 
 
 This project uses Wrangler 4.x. Make sure to use `npx wrangler` for all Wrangler commands.
 
-## Environment Variables
+## Environment Setup
 
-Before deploying, set up the following environment variables:
+### KV Namespaces
 
-- `ADMIN_TOKEN`: Secret token for admin API access
-- `SLACK_WEBHOOK`: Slack incoming webhook URL
+Create KV namespaces for different environments:
 
-## KV Namespace
+```bash
+# Development namespace
+wrangler kv:namespace create "DEAL_WATCHER" --env development
 
-Create a KV namespace called `DEAL_WATCHER` and update the namespace ID in `wrangler.toml`.
+# Production namespace  
+wrangler kv:namespace create "DEAL_WATCHER" --env production
+```
+
+Update the namespace IDs in `wrangler.toml` with the generated IDs.
+
+### Environment Variables
+
+Set up the following secrets using wrangler:
+
+```bash
+# Set admin token for API authentication
+wrangler secret put ADMIN_TOKEN
+
+# Set Slack webhook URL for notifications
+wrangler secret put SLACK_WEBHOOK
+```
+
+### Environment-Specific Deployment
+
+Deploy to different environments:
+
+```bash
+# Deploy to development
+wrangler deploy --env development
+
+# Deploy to production
+wrangler deploy --env production
+```
 
 ## Development Status
 
@@ -88,4 +117,4 @@ This project is currently in active development. See `progress.md` for detailed 
 - ✅ Comprehensive unit test coverage with 100% test coverage
 
 ### Ready for Deployment
-The core application is now complete and ready for deployment to Cloudflare Workers. Only deployment configuration (wrangler.toml setup) remains.
+The core application is now complete and ready for deployment to Cloudflare Workers. The deployment configuration supports both development and production environments with proper KV namespace separation and build pipeline setup.

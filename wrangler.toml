@@ -3,16 +3,32 @@ main = "src/index.ts"
 compatibility_date = "2025-08-08"
 compatibility_flags = ["nodejs_compat"]
 
-[env.production]
-kv_namespaces = [
-  { binding = "DEAL_WATCHER", id = "your-kv-namespace-id" }
-]
+# Build configuration
+[build]
+command = "npm run build"
 
-[env.production.vars]
-# Environment variables will be set via wrangler secret put
-# ADMIN_TOKEN = "your-admin-token"
-# SLACK_WEBHOOK = "your-slack-webhook-url"
+# KV namespace bindings for development
+kv_namespaces = [
+  { binding = "DEAL_WATCHER", id = "your-dev-kv-namespace-id", preview_id = "your-dev-kv-namespace-id" }
+]
 
 # Cron trigger - runs every 3 hours
 [[triggers.crons]]
 cron = "0 */3 * * *"
+
+# Production environment configuration
+[env.production]
+kv_namespaces = [
+  { binding = "DEAL_WATCHER", id = "your-prod-kv-namespace-id" }
+]
+
+# Development environment configuration
+[env.development]
+kv_namespaces = [
+  { binding = "DEAL_WATCHER", id = "your-dev-kv-namespace-id" }
+]
+
+# Environment variables (set via wrangler secret put)
+# These are configured as secrets for security:
+# - ADMIN_TOKEN: Authentication token for admin endpoints
+# - SLACK_WEBHOOK: Slack webhook URL for notifications

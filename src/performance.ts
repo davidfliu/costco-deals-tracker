@@ -2,7 +2,7 @@
  * Performance optimization utilities for the Costco Travel Watcher
  */
 
-import { Env, Target, TargetState, HistoricalSnapshot } from './types';
+import { Env, TargetState, HistoricalSnapshot } from './types';
 import { generateStateKey, generateHistoryKey, hashString } from './utils';
 
 /**
@@ -240,7 +240,9 @@ export class OptimizedTextProcessor {
     // Limit cache size to prevent memory issues
     if (this.hashCache.size > 1000) {
       const firstKey = this.hashCache.keys().next().value;
-      this.hashCache.delete(firstKey);
+      if (firstKey !== undefined) {
+        this.hashCache.delete(firstKey);
+      }
     }
     
     this.hashCache.set(input, hash);
@@ -281,7 +283,9 @@ export class OptimizedTextProcessor {
     // Limit cache size
     if (this.normalizeCache.size > 500) {
       const firstKey = this.normalizeCache.keys().next().value;
-      this.normalizeCache.delete(firstKey);
+      if (firstKey !== undefined) {
+        this.normalizeCache.delete(firstKey);
+      }
     }
 
     this.normalizeCache.set(text, normalized);
