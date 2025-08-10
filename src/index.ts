@@ -4,7 +4,7 @@
  * Monitors Costco Travel URLs for promotional changes and sends Slack notifications
  */
 
-import { Env, Target, TargetState, Promotion, ChangeResult } from './types';
+import { Env } from './types';
 
 /**
  * Main entry point for HTTP requests
@@ -100,7 +100,43 @@ export default {
    * Scheduled event handler for cron triggers
    */
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
-    // TODO: Implement scheduled monitoring logic
+    const startTime = Date.now();
     console.log('Scheduled event triggered at:', new Date(event.scheduledTime).toISOString());
+    
+    try {
+      // Import target processing function
+      const { processBatchTargets } = await import('./target-processing');
+      
+      // Execute batch processing of all targets
+      const result = await processBatchTargets(env);
+      
+      const duration = Date.now() - startTime;
+      
+      // Log execution results
+      console.log('Scheduled execution completed:', {
+        duration: `${duration}ms`,
+        totalTargets: result.totalTargets,
+        successfulTargets: result.successfulTargets,
+        failedTargets: result.failedTargets,
+        targetsWithChanges: result.targetsWithChanges,
+        notificationsSent: result.notificationsSent
+      });
+      
+      // Log any failed targets
+      const failedResults = result.results.filter(r => !r.success);
+      if (failedResults.length > 0) {
+        console.error('Failed targets during scheduled execution:', 
+          failedResults.map(r => ({ target: r.target.name || r.target.url, error: r.error }))
+        );
+      }
+      
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      console.error('Failed to execute scheduled monitoring:', error);
+      console.log('Scheduled execution failed after:', `${duration}ms`);
+      
+      // Don't throw - we want the worker to continue running
+      // Cloudflare will retry based on the cron schedule
+    }
   }
 };
