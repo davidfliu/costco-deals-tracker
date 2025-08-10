@@ -1615,3 +1615,128 @@ export async function handlePostTargets(request: Request, env: Env): Promise<Res
     );
   }
 }
+
+/**
+ * Handles POST /admin/run endpoint to trigger immediate monitoring execution
+ * 
+ * @param request - HTTP request object
+ * @param env - Environment variables containing KV namespace and secrets
+ * @returns HTTP response with execution results or error
+ */
+export async function handleManualRun(request: Request, env: Env): Promise<Response> {
+  try {
+    // Authenticate the request
+    const authResult = authenticateAdminRequest(request, env.ADMIN_TOKEN);
+    if (!authResult.authenticated) {
+      return createAuthErrorResponse(authResult);
+    }
+
+    // Get current timestamp for execution tracking
+    const startTime = Date.now();
+    const timestamp = new Date().toISOString();
+
+    console.log(`Manual run triggered at ${timestamp}`);
+
+    // Read targets configuration
+    const { readTargets } = await import('./kv-storage');
+    const targets = await readTargets(env);
+
+    if (targets.length === 0) {
+      return new Response(
+        JSON.stringify({
+          message: 'Manual run completed - no targets configured',
+          timestamp,
+          duration: Date.now() - startTime,
+          results: {
+            processed: 0,
+            successful: 0,
+            failed: 0,
+            changes: 0
+          }
+        }),
+        {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+    }
+
+    // Filter enabled targets
+    const enabledTargets = targets.filter(target => target.enabled !== false);
+
+    if (enabledTargets.length === 0) {
+      return new Response(
+        JSON.stringify({
+          message: 'Manual run completed - no enabled targets',
+          timestamp,
+          duration: Date.now() - startTime,
+          results: {
+            processed: 0,
+            successful: 0,
+            failed: 0,
+            changes: 0
+          }
+        }),
+        {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+    }
+
+    // TODO: This will be replaced with actual monitoring logic in tasks 8.1 and 8.2
+    // For now, simulate processing to provide a working endpoint
+    const results = {
+      processed: enabledTargets.length,
+      successful: enabledTargets.length,
+      failed: 0,
+      changes: 0,
+      targets: enabledTargets.map(target => ({
+        name: target.name || 'Unnamed Target',
+        url: target.url,
+        status: 'success',
+        message: 'Simulated processing - monitoring logic not yet implemented'
+      }))
+    };
+
+    const duration = Date.now() - startTime;
+
+    console.log(`Manual run completed in ${duration}ms - processed ${results.processed} targets`);
+
+    return new Response(
+      JSON.stringify({
+        message: 'Manual run completed successfully',
+        timestamp,
+        duration,
+        results
+      }),
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+  } catch (error) {
+    console.error('Failed to execute manual run:', error);
+    
+    return new Response(
+      JSON.stringify({
+        error: 'Failed to execute manual run',
+        code: 'INTERNAL_ERROR',
+        details: error instanceof Error ? error.message : String(error)
+      }),
+      {
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+  }
+}

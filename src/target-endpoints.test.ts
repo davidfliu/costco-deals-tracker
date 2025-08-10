@@ -65,7 +65,7 @@ describe('Target Management Endpoints', () => {
       expect(response.status).toBe(200);
       expect(response.headers.get('Content-Type')).toBe('application/json');
       
-      const body = await response.json();
+      const body = await response.json() as any;
       expect(body.targets).toEqual(sampleTargets);
       expect(body.count).toBe(2);
       expect(body.timestamp).toBeDefined();
@@ -86,7 +86,7 @@ describe('Target Management Endpoints', () => {
       
       expect(response.status).toBe(200);
       
-      const body = await response.json();
+      const body = await response.json() as any;
       expect(body.targets).toEqual([]);
       expect(body.count).toBe(0);
     });
@@ -102,7 +102,7 @@ describe('Target Management Endpoints', () => {
       expect(response.headers.get('Content-Type')).toBe('application/json');
       expect(response.headers.get('WWW-Authenticate')).toBe('Bearer');
       
-      const body = await response.json();
+      const body = await response.json() as any;
       expect(body.error).toBe('Missing authorization token');
       expect(body.code).toBe('UNAUTHORIZED');
       expect(mockReadTargets).not.toHaveBeenCalled();
@@ -120,7 +120,7 @@ describe('Target Management Endpoints', () => {
       
       expect(response.status).toBe(401);
       
-      const body = await response.json();
+      const body = await response.json() as any;
       expect(body.error).toBe('Invalid authorization token');
       expect(mockReadTargets).not.toHaveBeenCalled();
     });
@@ -139,7 +139,7 @@ describe('Target Management Endpoints', () => {
       
       expect(response.status).toBe(500);
       
-      const body = await response.json();
+      const body = await response.json() as any;
       expect(body.error).toBe('Failed to retrieve targets configuration');
       expect(body.code).toBe('INTERNAL_ERROR');
       expect(body.details).toBe('KV storage unavailable');
@@ -159,7 +159,7 @@ describe('Target Management Endpoints', () => {
       
       expect(response.status).toBe(500);
       
-      const body = await response.json();
+      const body = await response.json() as any;
       expect(body.details).toBe('String error');
     });
   });
@@ -181,7 +181,7 @@ describe('Target Management Endpoints', () => {
       expect(response.status).toBe(200);
       expect(response.headers.get('Content-Type')).toBe('application/json');
       
-      const body = await response.json();
+      const body = await response.json() as any;
       expect(body.message).toBe('Targets configuration updated successfully');
       expect(body.count).toBe(2);
       expect(body.timestamp).toBeDefined();
@@ -206,7 +206,7 @@ describe('Target Management Endpoints', () => {
       
       expect(response.status).toBe(200);
       
-      const body = await response.json();
+      const body = await response.json() as any;
       expect(body.count).toBe(2);
       
       expect(mockValidateTargets).toHaveBeenCalledWith(sampleTargets);
@@ -227,7 +227,7 @@ describe('Target Management Endpoints', () => {
       
       expect(response.status).toBe(200);
       
-      const body = await response.json();
+      const body = await response.json() as any;
       expect(body.count).toBe(0);
       
       expect(mockValidateTargets).toHaveBeenCalledWith([]);
@@ -247,7 +247,7 @@ describe('Target Management Endpoints', () => {
       
       expect(response.status).toBe(401);
       
-      const body = await response.json();
+      const body = await response.json() as any;
       expect(body.error).toBe('Missing authorization token');
       expect(mockValidateTargets).not.toHaveBeenCalled();
       expect(mockWriteTargets).not.toHaveBeenCalled();
@@ -267,7 +267,7 @@ describe('Target Management Endpoints', () => {
       
       expect(response.status).toBe(401);
       
-      const body = await response.json();
+      const body = await response.json() as any;
       expect(body.error).toBe('Invalid authorization token');
       expect(mockValidateTargets).not.toHaveBeenCalled();
       expect(mockWriteTargets).not.toHaveBeenCalled();
@@ -287,7 +287,7 @@ describe('Target Management Endpoints', () => {
       
       expect(response.status).toBe(400);
       
-      const body = await response.json();
+      const body = await response.json() as any;
       expect(body.error).toBe('Request body is required');
       expect(body.code).toBe('INVALID_REQUEST');
     });
@@ -306,7 +306,7 @@ describe('Target Management Endpoints', () => {
       
       expect(response.status).toBe(400);
       
-      const body = await response.json();
+      const body = await response.json() as any;
       expect(body.error).toBe('Request body is required');
     });
 
@@ -324,7 +324,7 @@ describe('Target Management Endpoints', () => {
       
       expect(response.status).toBe(400);
       
-      const body = await response.json();
+      const body = await response.json() as any;
       expect(body.error).toBe('Invalid JSON in request body');
       expect(body.code).toBe('INVALID_JSON');
       expect(body.details).toBeDefined();
@@ -344,7 +344,7 @@ describe('Target Management Endpoints', () => {
       
       expect(response.status).toBe(400);
       
-      const body = await response.json();
+      const body = await response.json() as any;
       expect(body.error).toBe('Request body must be an object');
       expect(body.code).toBe('INVALID_REQUEST');
     });
@@ -363,7 +363,7 @@ describe('Target Management Endpoints', () => {
       
       expect(response.status).toBe(400);
       
-      const body = await response.json();
+      const body = await response.json() as any;
       expect(body.error).toBe('Request must contain a "targets" array or be an array of targets');
       expect(body.code).toBe('INVALID_REQUEST');
     });
@@ -386,7 +386,7 @@ describe('Target Management Endpoints', () => {
       
       expect(response.status).toBe(400);
       
-      const body = await response.json();
+      const body = await response.json() as any;
       expect(body.error).toBe('Invalid targets configuration');
       expect(body.code).toBe('INVALID_TARGETS');
       expect(body.details).toContain('url and selector properties');
@@ -411,7 +411,7 @@ describe('Target Management Endpoints', () => {
       
       expect(response.status).toBe(500);
       
-      const body = await response.json();
+      const body = await response.json() as any;
       expect(body.error).toBe('Failed to update targets configuration');
       expect(body.code).toBe('INTERNAL_ERROR');
       expect(body.details).toBe('KV write failed');
@@ -433,7 +433,7 @@ describe('Target Management Endpoints', () => {
       
       expect(response.status).toBe(500);
       
-      const body = await response.json();
+      const body = await response.json() as any;
       expect(body.details).toBe('String error');
     });
 
@@ -453,7 +453,7 @@ describe('Target Management Endpoints', () => {
       
       expect(response.status).toBe(500);
       
-      const body = await response.json();
+      const body = await response.json() as any;
       expect(body.details).toBe('Invalid targets configuration provided');
     });
   });
@@ -473,7 +473,7 @@ describe('Target Management Endpoints', () => {
       
       expect(response.status).toBe(200);
       
-      const body = await response.json();
+      const body = await response.json() as any;
       expect(body.targets).toHaveLength(2);
       expect(body.targets[0].name).toBe('Hawaii Packages');
       expect(body.targets[1].enabled).toBe(false);
@@ -502,7 +502,7 @@ describe('Target Management Endpoints', () => {
       
       expect(response.status).toBe(200);
       
-      const body = await response.json();
+      const body = await response.json() as any;
       expect(body.message).toContain('updated successfully');
       expect(body.count).toBe(1);
       
@@ -532,7 +532,7 @@ describe('Target Management Endpoints', () => {
       
       expect(response.status).toBe(200);
       
-      const body = await response.json();
+      const body = await response.json() as any;
       expect(body.count).toBe(100);
     });
 
@@ -577,7 +577,7 @@ describe('Target Management Endpoints', () => {
       
       expect(response.status).toBe(400);
       
-      const body = await response.json();
+      const body = await response.json() as any;
       expect(body.error).toBe('Request body must be an object');
     });
   });

@@ -9,10 +9,12 @@ import { Env } from './types';
 // Mock the utils module
 const mockHandleGetTargets = vi.fn();
 const mockHandlePostTargets = vi.fn();
+const mockHandleManualRun = vi.fn();
 
 vi.mock('./utils', () => ({
   handleGetTargets: mockHandleGetTargets,
-  handlePostTargets: mockHandlePostTargets
+  handlePostTargets: mockHandlePostTargets,
+  handleManualRun: mockHandleManualRun
 }));
 
 describe('Request Routing', () => {
@@ -74,7 +76,7 @@ describe('Request Routing', () => {
       expect(response.headers.get('Allow')).toBe('GET, POST');
       expect(response.headers.get('Content-Type')).toBe('application/json');
 
-      const body = await response.json();
+      const body = await response.json() as any;
       expect(body.error).toBe('Method not allowed');
       expect(body.code).toBe('METHOD_NOT_ALLOWED');
       expect(body.allowed).toEqual(['GET', 'POST']);
@@ -106,6 +108,67 @@ describe('Request Routing', () => {
     });
   });
 
+  describe('Manual Run Endpoint', () => {
+    it('should route POST /admin/run to handleManualRun', async () => {
+      const mockResponse = new Response('Manual run response');
+      mockHandleManualRun.mockResolvedValue(mockResponse);
+
+      const request = new Request('https://example.com/admin/run', {
+        method: 'POST'
+      });
+
+      const response = await worker.fetch(request, mockEnv, mockCtx);
+
+      expect(mockHandleManualRun).toHaveBeenCalledWith(request, mockEnv);
+      expect(mockHandleGetTargets).not.toHaveBeenCalled();
+      expect(mockHandlePostTargets).not.toHaveBeenCalled();
+      expect(response).toBe(mockResponse);
+    });
+
+    it('should return 405 for unsupported methods on /admin/run', async () => {
+      const request = new Request('https://example.com/admin/run', {
+        method: 'GET'
+      });
+
+      const response = await worker.fetch(request, mockEnv, mockCtx);
+
+      expect(response.status).toBe(405);
+      expect(response.headers.get('Allow')).toBe('POST');
+      expect(response.headers.get('Content-Type')).toBe('application/json');
+
+      const body = await response.json() as any;
+      expect(body.error).toBe('Method not allowed');
+      expect(body.code).toBe('METHOD_NOT_ALLOWED');
+      expect(body.allowed).toEqual(['POST']);
+
+      expect(mockHandleManualRun).not.toHaveBeenCalled();
+      expect(mockHandleGetTargets).not.toHaveBeenCalled();
+      expect(mockHandlePostTargets).not.toHaveBeenCalled();
+    });
+
+    it('should handle PUT method on /admin/run', async () => {
+      const request = new Request('https://example.com/admin/run', {
+        method: 'PUT'
+      });
+
+      const response = await worker.fetch(request, mockEnv, mockCtx);
+
+      expect(response.status).toBe(405);
+      expect(mockHandleManualRun).not.toHaveBeenCalled();
+    });
+
+    it('should handle DELETE method on /admin/run', async () => {
+      const request = new Request('https://example.com/admin/run', {
+        method: 'DELETE'
+      });
+
+      const response = await worker.fetch(request, mockEnv, mockCtx);
+
+      expect(response.status).toBe(405);
+      expect(mockHandleManualRun).not.toHaveBeenCalled();
+    });
+  });
+
   describe('Health Check Endpoint', () => {
     it('should handle GET /healthz', async () => {
       const request = new Request('https://example.com/healthz', {
@@ -117,13 +180,14 @@ describe('Request Routing', () => {
       expect(response.status).toBe(200);
       expect(response.headers.get('Content-Type')).toBe('application/json');
 
-      const body = await response.json();
+      const body = await response.json() as any;
       expect(body.status).toBe('healthy');
       expect(body.timestamp).toBeDefined();
       expect(body.version).toBe('1.0.0');
 
       expect(mockHandleGetTargets).not.toHaveBeenCalled();
       expect(mockHandlePostTargets).not.toHaveBeenCalled();
+      expect(mockHandleManualRun).not.toHaveBeenCalled();
     });
 
     it('should return 404 for non-GET methods on /healthz', async () => {
@@ -148,13 +212,14 @@ describe('Request Routing', () => {
       expect(response.status).toBe(404);
       expect(response.headers.get('Content-Type')).toBe('application/json');
 
-      const body = await response.json();
+      const body = await response.json() as any;
       expect(body.error).toBe('Not found');
       expect(body.code).toBe('NOT_FOUND');
       expect(body.path).toBe('/unknown/path');
 
       expect(mockHandleGetTargets).not.toHaveBeenCalled();
       expect(mockHandlePostTargets).not.toHaveBeenCalled();
+      expect(mockHandleManualRun).not.toHaveBeenCalled();
     });
 
     it('should return 404 for root path', async () => {
@@ -166,7 +231,7 @@ describe('Request Routing', () => {
 
       expect(response.status).toBe(404);
 
-      const body = await response.json();
+      const body = await response.json() as any;
       expect(body.path).toBe('/');
     });
 
@@ -179,7 +244,7 @@ describe('Request Routing', () => {
 
       expect(response.status).toBe(404);
 
-      const body = await response.json();
+      const body = await response.json() as any;
       expect(body.path).toBe('/admin');
     });
   });

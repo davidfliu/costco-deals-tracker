@@ -71,9 +71,9 @@ This project is currently in active development. See `progress.md` for detailed 
 - ✅ Complete KV storage layer with target, state, and history management
 - ✅ Authentication middleware with constant-time token validation
 - ✅ Admin API target management endpoints (GET/POST /admin/targets)
+- ✅ Manual run endpoint (POST /admin/run) with target processing simulation
 - ✅ Comprehensive unit test coverage with 100% test coverage
 
 ### In Progress
 - 🔄 Slack notification system
 - 🔄 Core monitoring logic
-- 🔄 Manual run endpoint
