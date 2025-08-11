@@ -88,6 +88,8 @@ npx wrangler deploy --env production
 - **Change Detection**: Content-based hashing with material change filtering (ignores minor text variations)
 - **State Management**: Current state + historical snapshots with automatic pruning
 - **Error Resilience**: Individual target failures don't affect batch processing; notification failures don't fail processing
+- **Enhanced Content Analysis**: Advanced deal extraction with hotel names, locations, pricing, and package details
+- **Rich Notifications**: Slack messages with structured deal information, emojis, and comprehensive summaries
 
 ### Storage Schema (KV)
 
@@ -101,37 +103,108 @@ npx wrangler deploy --env production
 - `GET /admin/targets` - List all targets (requires ADMIN_TOKEN)
 - `POST /admin/targets` - Create/update targets (requires ADMIN_TOKEN)
 - `POST /admin/run` - Manual batch execution (requires ADMIN_TOKEN)
+- `POST /admin/test-slack` - Test Slack webhook integration (requires ADMIN_TOKEN)
+- `POST /admin/test-e2e` - End-to-end testing workflow for URL monitoring (requires ADMIN_TOKEN)
 
-### Target Configuration
+### Current Monitoring Configuration
 
-After deployment, configure monitoring targets using the admin API:
+The system is currently configured to monitor the following targets:
 
+**Active Targets:**
+1. **Kauai: 1 Hotel Hanalei Bay Package**
+   - URL: `https://www.costcotravel.com/Vacation-Packages/Offers/HAWLIH1HOTELHANALEIBAY20230309`
+   - Monitors: Promotional package deals, resort credits, special offers
+   - Selector: `.deal-info, .package-details, .offer-details, .promo-info, .price, .resort-credit`
+
+2. **Kauai: 1 Hotel Hanalei Bay - Hotel Rates**
+   - URL: `https://www.costcotravel.com/Hotels/Hawaii/Kauai/Kauai1HotelHanaleiBay`
+   - Monitors: General hotel room rates and availability
+   - Selector: `.deal-info, .package-details, .offer-details, .promo-info, .price, .rate, .hotel-rate`
+
+### Target Management
+
+**Add/Update Targets:**
 ```bash
-# Add a target URL to monitor
 curl -X POST \
   -H "Authorization: Bearer your-admin-token" \
   -H "Content-Type: application/json" \
   -d '{
     "targets": [
       {
-        "url": "https://www.costcotravel.com/Travel-Offers/Travel-Hot-Buys",
-        "name": "Costco Travel Hot Buys",
+        "url": "https://www.costcotravel.com/your-target-url",
+        "name": "Your Target Name",
         "enabled": true,
-        "selector": ".promo, .deal-info, .savings, .hot-buy, .offer-details, .price, .discount"
+        "selector": ".promo, .deal-info, .price, .discount",
+        "notes": "Optional description of what this target monitors"
       }
     ]
   }' \
   https://your-worker-url.workers.dev/admin/targets
+```
 
-# List configured targets
+**List Current Targets:**
+```bash
 curl -H "Authorization: Bearer your-admin-token" \
   https://your-worker-url.workers.dev/admin/targets
+```
 
-# Trigger manual check
+**Manual Execution:**
+```bash
 curl -X POST \
   -H "Authorization: Bearer your-admin-token" \
   https://your-worker-url.workers.dev/admin/run
 ```
+
+### Testing and Debugging
+
+**Test Slack Integration:**
+```bash
+curl -X POST \
+  -H "Authorization: Bearer your-admin-token" \
+  https://your-worker-url.workers.dev/admin/test-slack
+```
+
+**End-to-End URL Testing:**
+```bash
+curl -X POST \
+  -H "Authorization: Bearer your-admin-token" \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://www.costcotravel.com/any-url-to-test"}' \
+  https://your-worker-url.workers.dev/admin/test-e2e
+```
+
+The E2E endpoint provides detailed content analysis including:
+- **Deal extraction**: Hotel names, packages, pricing, savings
+- **Location identification**: Destinations and resort locations  
+- **Rich Slack formatting**: Comprehensive deal summaries with emojis
+- **Debug output**: Console logging for development and troubleshooting
+
+### Content Analysis Features
+
+The system includes advanced content extraction capabilities:
+
+**Deal Detection Patterns:**
+- Hotel and resort names (Hyatt, Marriott, Hilton, Ritz-Carlton, etc.)
+- Location extraction (Hawaii, Las Vegas, Caribbean, Europe, etc.)
+- Pricing information ($150, $1,260, "from $536", etc.)
+- Savings amounts ("Save $300", "50% off", etc.)
+- Package details (resort credits, waived fees, stay 4/pay 3, etc.)
+- Date information (booking deadlines, travel dates, etc.)
+
+**Content Cleaning:**
+- HTML entity decoding (&#x27; → ', &nbsp; → space)
+- Text artifact removal (navigation elements, partial words)
+- Title extraction with natural language breaks
+- Price context analysis (per night, per person, package total)
+
+**Slack Notification Format:**
+- 🎯 Deal count and summary
+- 💰 Pricing with context  
+- 💸 Savings amounts
+- 📍 Location information
+- 📅 Date restrictions
+- 📝 Package descriptions
+- Rich formatting with headers, dividers, and context sections
 
 ## Development Notes
 
