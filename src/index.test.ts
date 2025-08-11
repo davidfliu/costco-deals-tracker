@@ -271,7 +271,26 @@ describe('Worker Integration Tests', () => {
 
       const mockEvent: ScheduledEvent = {
         scheduledTime: Date.now(),
-        cron: '0 */3 * * *'
+        cron: '0 */3 * * *',
+        type: 'scheduled' as const,
+        passThroughOnException: () => {},
+        waitUntil: () => {},
+        noRetry: () => {},
+        eventPhase: 0,
+        stopPropagation: () => {},
+        stopImmediatePropagation: () => {},
+        preventDefault: () => {},
+        returnValue: true,
+        defaultPrevented: false,
+        composed: false,
+        isTrusted: false,
+        timeStamp: Date.now(),
+        bubbles: false,
+        cancelBubble: false,
+        cancelable: false,
+        currentTarget: null,
+        target: null,
+        srcElement: null
       };
 
       const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});

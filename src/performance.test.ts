@@ -32,7 +32,7 @@ describe('Performance Optimizations', () => {
   describe('KVBatch', () => {
     it('should batch multiple read operations', async () => {
       const batch = new KVBatch(mockEnv);
-      vi.mocked(mockEnv.DEAL_WATCHER.get).mockResolvedValue('test-value');
+      (mockEnv.DEAL_WATCHER.get as any).mockResolvedValue('test-value');
 
       // Queue multiple reads for the same key
       const promise1 = batch.queueRead('test-key');
@@ -91,7 +91,7 @@ describe('Performance Optimizations', () => {
         lastSeenISO: '2025-01-01T00:00:00Z'
       };
 
-      vi.mocked(mockEnv.DEAL_WATCHER.get).mockResolvedValue(JSON.stringify(mockState));
+      (mockEnv.DEAL_WATCHER.get as any).mockResolvedValue(JSON.stringify(mockState));
 
       // First read should hit KV
       const result1 = await manager.readTargetStates(['https://example.com']);
@@ -355,7 +355,7 @@ describe('Performance Optimizations', () => {
 
     it('should demonstrate KV operation optimization', async () => {
       const manager = new OptimizedStateManager(mockEnv);
-      vi.mocked(mockEnv.DEAL_WATCHER.get).mockResolvedValue(JSON.stringify({
+      (mockEnv.DEAL_WATCHER.get as any).mockResolvedValue(JSON.stringify({
         hash: 'test',
         promos: [],
         lastSeenISO: '2025-01-01T00:00:00Z'
@@ -393,7 +393,7 @@ describe('Performance Optimizations', () => {
       const manager = new OptimizedStateManager(mockEnv);
 
       // Mock KV responses
-      vi.mocked(mockEnv.DEAL_WATCHER.get).mockResolvedValue(JSON.stringify({
+      (mockEnv.DEAL_WATCHER.get as any).mockResolvedValue(JSON.stringify({
         hash: 'test',
         promos: [],
         lastSeenISO: '2025-01-01T00:00:00Z'

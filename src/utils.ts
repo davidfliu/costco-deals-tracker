@@ -1297,11 +1297,8 @@ function constantTimeEquals(a: string, b: string): boolean {
   aPadded.set(aBytes);
   bPadded.set(bBytes);
 
-  // Prefer built-in timing safe comparison when available
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-  if (typeof crypto.timingSafeEqual === 'function') {
-    return crypto.timingSafeEqual(aPadded, bPadded);
-  }
+  // Note: crypto.timingSafeEqual is not available in Cloudflare Workers
+  // Use manual constant-time comparison instead
 
   // Fallback to manual constant-time comparison
   let diff = 0;
