@@ -28,93 +28,131 @@ A serverless monitoring system that tracks promotional changes on Costco Travel 
 └── progress.md           # Development progress tracking
 ```
 
-## Setup
+## Quick Start
 
-1. Install dependencies:
+### Development Setup
+
+1. **Install dependencies:**
    ```bash
    npm install
    ```
 
-2. Run tests:
+2. **Run tests:**
    ```bash
    npm test
    ```
 
-3. Start development server:
+3. **Start development server:**
    ```bash
    npm run dev
    ```
 
-4. Deploy to Cloudflare:
+### Production Deployment
+
+The application is **currently deployed and running** at:
+- **Production URL**: https://costco-deals-tracker-production.rumalzliu.workers.dev
+- **Monitoring**: Costco Travel Hot Buys page every 3 hours
+- **Status**: ✅ Active and operational
+
+#### Deploy Latest Changes
+
+```bash
+# Build and deploy to production
+npm run build
+npx wrangler deploy --env production
+```
+
+#### First-Time Production Setup
+
+If setting up a new deployment:
+
+1. **Authenticate with Cloudflare:**
    ```bash
-   npm run deploy
+   npx wrangler login
    ```
 
-## Wrangler Version
+2. **Create KV namespaces:**
+   ```bash
+   npx wrangler kv namespace create "DEAL_WATCHER" --env development
+   npx wrangler kv namespace create "DEAL_WATCHER" --env production
+   ```
 
-This project uses Wrangler 4.x. Make sure to use `npx wrangler` for all Wrangler commands.
+3. **Set production secrets:**
+   ```bash
+   # Generate secure admin token
+   openssl rand -hex 32
+   
+   # Set secrets (use environment-specific flags)
+   echo "your-admin-token" | npx wrangler secret put ADMIN_TOKEN --env production
+   echo "your-slack-webhook-url" | npx wrangler secret put SLACK_WEBHOOK --env production
+   ```
 
-## Environment Setup
+4. **Update wrangler.toml** with the real KV namespace IDs from step 2.
 
-### KV Namespaces
+## Usage
 
-Create KV namespaces for different environments:
+### Admin API
 
-```bash
-# Development namespace
-wrangler kv:namespace create "DEAL_WATCHER" --env development
-
-# Production namespace  
-wrangler kv:namespace create "DEAL_WATCHER" --env production
-```
-
-Update the namespace IDs in `wrangler.toml` with the generated IDs.
-
-### Environment Variables
-
-Set up the following secrets using wrangler:
-
-```bash
-# Set admin token for API authentication
-wrangler secret put ADMIN_TOKEN
-
-# Set Slack webhook URL for notifications
-wrangler secret put SLACK_WEBHOOK
-```
-
-### Environment-Specific Deployment
-
-Deploy to different environments:
+Use the admin API to manage monitoring targets:
 
 ```bash
-# Deploy to development
-wrangler deploy --env development
+# List all configured targets
+curl -H "Authorization: Bearer your-admin-token" \
+  https://costco-deals-tracker-production.rumalzliu.workers.dev/admin/targets
 
-# Deploy to production
-wrangler deploy --env production
+# Add a new target to monitor
+curl -X POST \
+  -H "Authorization: Bearer your-admin-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "targets": [
+      {
+        "url": "https://www.costcotravel.com/Travel-Offers/Travel-Hot-Buys",
+        "name": "Costco Travel Hot Buys",
+        "enabled": true,
+        "selector": ".promo, .deal-info, .savings, .hot-buy, .offer-details, .price, .discount"
+      }
+    ]
+  }' \
+  https://costco-deals-tracker-production.rumalzliu.workers.dev/admin/targets
+
+# Trigger manual monitoring check
+curl -X POST \
+  -H "Authorization: Bearer your-admin-token" \
+  https://costco-deals-tracker-production.rumalzliu.workers.dev/admin/run
 ```
+
+### Health Check
+
+```bash
+curl https://costco-deals-tracker-production.rumalzliu.workers.dev/healthz
+```
+
+## Features
+
+### ✅ Production Ready
+- **Serverless Architecture**: Deployed on Cloudflare Workers
+- **Scheduled Monitoring**: Automatic checks every 3 hours via cron
+- **Slack Notifications**: Real-time alerts when deals change
+- **Admin API**: Full CRUD operations for target management
+- **Security**: Bearer token authentication with constant-time comparison
+- **Error Resilience**: Individual target failures don't affect batch processing
+- **Performance**: Parallel processing with HTMLRewriter optimization
+
+### ✅ Monitoring Capabilities  
+- **Change Detection**: Content-based hashing with material change filtering
+- **State Management**: Current state + historical snapshots with auto-pruning
+- **Content Parsing**: Advanced HTML parsing for promotional content
+- **Noise Filtering**: Ignores minor text variations and timestamps
+
+### ✅ Infrastructure
+- **KV Storage**: Persistent state and configuration storage
+- **Environment Separation**: Development and production environments
+- **Build Pipeline**: TypeScript compilation and deployment automation
+- **Test Coverage**: Comprehensive unit and integration tests
 
 ## Development Status
 
-This project is currently in active development. See `progress.md` for detailed implementation status and recent changes.
+**Status**: ✅ **Production Deployed and Operational**
 
-### Completed Features
-- ✅ URL hashing utilities for stable KV key generation
-- ✅ Text normalization and noise filtering for promotional content
-- ✅ Promotion ID generation using content-based hashing
-- ✅ HTML parsing and content extraction using HTMLRewriter
-- ✅ Content fetching with proper headers and error handling
-- ✅ Change detection engine with material change filtering
-- ✅ Complete KV storage layer with target, state, and history management
-- ✅ Slack notification system with rich message formatting
-- ✅ Authentication middleware with constant-time token validation
-- ✅ Admin API target management endpoints (GET/POST /admin/targets)
-- ✅ Manual run endpoint (POST /admin/run) with complete target processing
-- ✅ Core target processing logic with parallel batch processing
-- ✅ Scheduled event handler for automatic cron-based monitoring
-- ✅ Complete HTTP request routing and main worker entry point
-- ✅ Health check endpoint (GET /healthz) for system monitoring
-- ✅ Comprehensive unit test coverage with 100% test coverage
-
-### Ready for Deployment
-The core application is now complete and ready for deployment to Cloudflare Workers. The deployment configuration supports both development and production environments with proper KV namespace separation and build pipeline setup.
+The application is fully developed, tested, and deployed to production. It's currently monitoring the Costco Travel Hot Buys page and will send Slack notifications when promotional changes are detected.

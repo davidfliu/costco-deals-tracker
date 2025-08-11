@@ -1618,7 +1618,7 @@ function validateTargetUrl(url: string): boolean {
  * @returns HTML content as string
  * @throws Error if fetch fails or returns non-200 status
  */
-export async function fetchContent(url: string, timeoutMs: number = 30000): Promise<string> {
+export async function fetchContent(url: string, timeoutMs: number = 15000): Promise<string> {
   // Validate URL before making request
   if (!validateTargetUrl(url)) {
     throw new Error('URL not allowed: Only HTTPS URLs from approved Costco domains are permitted');
@@ -1631,12 +1631,16 @@ export async function fetchContent(url: string, timeoutMs: number = 30000): Prom
     const response = await fetch(url, {
       method: 'GET',
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; CostcoTravelWatcher/1.0; +https://github.com/costco-travel-watcher)',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Accept-Encoding': 'gzip, deflate',
-        'DNT': '1',
-        'Connection': 'keep-alive',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Sec-Fetch-User': '?1',
         'Upgrade-Insecure-Requests': '1'
       },
       signal: controller.signal
@@ -1956,24 +1960,31 @@ export async function handleManualRun(request: Request, env: Env): Promise<Respo
       );
     }
 
-    // TODO: This will be replaced with actual monitoring logic in tasks 8.1 and 8.2
-    // For now, simulate processing to provide a working endpoint
+    // Execute actual monitoring logic using processBatchTargets
+    const { processBatchTargets } = await import('./target-processing');
+    const batchResult = await processBatchTargets(env);
+
+    // Convert BatchProcessingResult to expected response format
     const results = {
-      processed: enabledTargets.length,
-      successful: enabledTargets.length,
-      failed: 0,
-      changes: 0,
-      targets: enabledTargets.map(target => ({
-        name: target.name || 'Unnamed Target',
-        url: target.url,
-        status: 'success',
-        message: 'Simulated processing - monitoring logic not yet implemented'
+      processed: batchResult.totalTargets,
+      successful: batchResult.successfulTargets,
+      failed: batchResult.failedTargets,
+      changes: batchResult.targetsWithChanges,
+      targets: batchResult.results.map(result => ({
+        name: result.target.name || 'Unnamed Target',
+        url: result.target.url,
+        status: result.success ? 'success' : 'failed',
+        message: result.success 
+          ? (result.changes?.hasChanges 
+              ? `Changes detected: ${result.changes.summary}` 
+              : 'No changes detected')
+          : result.error || 'Processing failed'
       }))
     };
 
     const duration = Date.now() - startTime;
 
-    console.log(`Manual run completed in ${duration}ms - processed ${results.processed} targets`);
+    console.log(`Manual run completed in ${duration}ms - ${batchResult.summary}`);
 
     return new Response(
       JSON.stringify({

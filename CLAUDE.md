@@ -20,17 +20,51 @@ Costco Travel Deal Watcher is a serverless Cloudflare Workers application that m
 - `npm run deploy:prod` - Deploy to production environment
 
 ### Environment Setup
-Before deployment, configure KV namespaces and secrets:
 
+#### Prerequisites
+- Cloudflare account with Workers enabled
+- Slack workspace with incoming webhook configured
+- Node.js and npm installed locally
+
+#### Production Deployment Steps
+
+1. **Authenticate with Cloudflare:**
 ```bash
-# Create KV namespaces
-wrangler kv:namespace create "DEAL_WATCHER" --env development
-wrangler kv:namespace create "DEAL_WATCHER" --env production
-
-# Set secrets
-wrangler secret put ADMIN_TOKEN
-wrangler secret put SLACK_WEBHOOK
+npx wrangler login
 ```
+
+2. **Create KV Namespaces:**
+```bash
+# Create development namespace
+npx wrangler kv namespace create "DEAL_WATCHER" --env development
+
+# Create production namespace  
+npx wrangler kv namespace create "DEAL_WATCHER" --env production
+```
+
+3. **Update wrangler.toml with real namespace IDs** from the create commands above.
+
+4. **Set Production Secrets:**
+```bash
+# Generate secure admin token (store this safely!)
+openssl rand -hex 32
+
+# Set secrets for production environment
+echo "your-generated-admin-token" | npx wrangler secret put ADMIN_TOKEN --env production
+echo "your-slack-webhook-url" | npx wrangler secret put SLACK_WEBHOOK --env production
+```
+
+5. **Deploy to Production:**
+```bash
+npm run build
+npx wrangler deploy --env production
+```
+
+#### Security Notes
+- **Never commit secrets to git** - they are stored securely in Cloudflare
+- **Build files (*.js) are excluded** from version control via .gitignore
+- **Admin tokens should be stored in a password manager**
+- **Slack webhooks should be rotated if compromised**
 
 ## Architecture Overview
 
@@ -67,6 +101,37 @@ wrangler secret put SLACK_WEBHOOK
 - `GET /admin/targets` - List all targets (requires ADMIN_TOKEN)
 - `POST /admin/targets` - Create/update targets (requires ADMIN_TOKEN)
 - `POST /admin/run` - Manual batch execution (requires ADMIN_TOKEN)
+
+### Target Configuration
+
+After deployment, configure monitoring targets using the admin API:
+
+```bash
+# Add a target URL to monitor
+curl -X POST \
+  -H "Authorization: Bearer your-admin-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "targets": [
+      {
+        "url": "https://www.costcotravel.com/Travel-Offers/Travel-Hot-Buys",
+        "name": "Costco Travel Hot Buys",
+        "enabled": true,
+        "selector": ".promo, .deal-info, .savings, .hot-buy, .offer-details, .price, .discount"
+      }
+    ]
+  }' \
+  https://your-worker-url.workers.dev/admin/targets
+
+# List configured targets
+curl -H "Authorization: Bearer your-admin-token" \
+  https://your-worker-url.workers.dev/admin/targets
+
+# Trigger manual check
+curl -X POST \
+  -H "Authorization: Bearer your-admin-token" \
+  https://your-worker-url.workers.dev/admin/run
+```
 
 ## Development Notes
 
