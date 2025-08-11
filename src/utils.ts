@@ -1285,20 +1285,30 @@ export function validateAdminToken(providedToken: string | null, validToken: str
  * @returns True if strings are equal
  */
 function constantTimeEquals(a: string, b: string): boolean {
-  // If lengths differ, still perform comparison to maintain constant time
-  const aLength = a.length;
-  const bLength = b.length;
-  const maxLength = Math.max(aLength, bLength);
-  
-  let result = aLength === bLength ? 0 : 1;
-  
-  for (let i = 0; i < maxLength; i++) {
-    const aChar = i < aLength ? a.charCodeAt(i) : 0;
-    const bChar = i < bLength ? b.charCodeAt(i) : 0;
-    result |= aChar ^ bChar;
+  // Use byte representations to avoid optimizations on string operations
+  const encoder = new TextEncoder();
+  const aBytes = encoder.encode(a);
+  const bBytes = encoder.encode(b);
+  const maxLength = Math.max(aBytes.length, bBytes.length);
+
+  // Pad both arrays to equal length to avoid leaking length information
+  const aPadded = new Uint8Array(maxLength);
+  const bPadded = new Uint8Array(maxLength);
+  aPadded.set(aBytes);
+  bPadded.set(bBytes);
+
+  // Prefer built-in timing safe comparison when available
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  if (typeof crypto.timingSafeEqual === 'function') {
+    return crypto.timingSafeEqual(aPadded, bPadded);
   }
-  
-  return result === 0;
+
+  // Fallback to manual constant-time comparison
+  let diff = 0;
+  for (let i = 0; i < maxLength; i++) {
+    diff |= aPadded[i] ^ bPadded[i];
+  }
+  return diff === 0;
 }
 
 /**
