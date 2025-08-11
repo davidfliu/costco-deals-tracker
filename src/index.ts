@@ -37,7 +37,7 @@ export default {
     const { pathname, method } = { pathname: url.pathname, method: request.method };
 
     // Import endpoint handlers
-    const { handleGetTargets, handlePostTargets, handleManualRun } = await import('./utils');
+    const { handleGetTargets, handlePostTargets, handleManualRun, handleTestSlack, handleTestE2E } = await import('./utils');
 
     // Route admin endpoints
     if (pathname === '/admin/targets') {
@@ -67,6 +67,50 @@ export default {
     if (pathname === '/admin/run') {
       if (method === 'POST') {
         return await handleManualRun(request, env);
+      } else {
+        return new Response(
+          JSON.stringify({
+            error: 'Method not allowed',
+            code: 'METHOD_NOT_ALLOWED',
+            allowed: ['POST']
+          }),
+          {
+            status: 405,
+            headers: {
+              'Content-Type': 'application/json',
+              'Allow': 'POST'
+            }
+          }
+        );
+      }
+    }
+
+    // Test Slack notification endpoint
+    if (pathname === '/admin/test-slack') {
+      if (method === 'POST') {
+        return await handleTestSlack(request, env);
+      } else {
+        return new Response(
+          JSON.stringify({
+            error: 'Method not allowed',
+            code: 'METHOD_NOT_ALLOWED',
+            allowed: ['POST']
+          }),
+          {
+            status: 405,
+            headers: {
+              'Content-Type': 'application/json',
+              'Allow': 'POST'
+            }
+          }
+        );
+      }
+    }
+
+    // E2E test endpoint
+    if (pathname === '/admin/test-e2e') {
+      if (method === 'POST') {
+        return await handleTestE2E(request, env);
       } else {
         return new Response(
           JSON.stringify({

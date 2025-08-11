@@ -2001,7 +2001,6 @@ export async function handleManualRun(request: Request, env: Env): Promise<Respo
 
   } catch (error) {
     const sanitizedMessage = sanitizeErrorMessage(error, 'Failed to execute manual run');
-    
     return new Response(
       JSON.stringify({
         error: sanitizedMessage,
@@ -2013,4 +2012,404 @@ export async function handleManualRun(request: Request, env: Env): Promise<Respo
       }
     );
   }
+}
+/**
+ * Handles test Slack notification endpoint - sends a test message to verify webhook
+ * 
+ * @param request - HTTP request object
+ * @param env - Environment variables containing secrets
+ * @returns Response with test result
+ */
+export async function handleTestSlack(request: Request, env: Env): Promise<Response> {
+  try {
+    // Rate limiting check
+    const clientIP = request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For') || 'unknown';
+    const isAllowed = await checkRateLimit(env, `admin:test-slack:${clientIP}`, 3, 300000); // 3 requests per 5 minutes
+    if (!isAllowed) {
+      return createRateLimitResponse(300); // 5 minutes
+    }
+
+    // Authenticate the request
+    const authResult = authenticateAdminRequest(request, env.ADMIN_TOKEN);
+    if (!authResult.authenticated) {
+      return createAuthErrorResponse(authResult);
+    }
+
+    // Check if Slack webhook is configured
+    if (!env.SLACK_WEBHOOK) {
+      return new Response(
+        JSON.stringify({
+          error: 'Slack webhook not configured',
+          code: 'SLACK_NOT_CONFIGURED',
+          message: 'SLACK_WEBHOOK environment variable is not set'
+        }),
+        {
+          status: 400,
+          headers: createSecurityHeaders()
+        }
+      );
+    }
+
+    const timestamp = new Date().toISOString();
+
+    // Create test message
+    const testMessage = formatSlackMessage(
+      'Test Notification',
+      'https://costco-deals-tracker-production.rumalzliu.workers.dev/admin/test-slack',
+      {
+        hasChanges: true,
+        added: [
+          {
+            id: 'test-promo-1',
+            title: 'Test Deal Alert',
+            perk: 'This is a test notification to verify your Slack integration is working properly. Save $300 on this exclusive test deal!',
+            price: 'Starting from $999 (was $1,299)',
+            dates: 'Valid through December 31, 2025'
+          }
+        ],
+        removed: [],
+        changed: [],
+        summary: 'Test notification sent successfully'
+      },
+      timestamp
+    );
+
+    // Send test notification
+    console.log('Sending test Slack notification...');
+    await sendSlackNotification(env.SLACK_WEBHOOK, testMessage);
+
+    return new Response(
+      JSON.stringify({
+        message: 'Test Slack notification sent successfully',
+        timestamp,
+        webhook: env.SLACK_WEBHOOK.substring(0, 30) + '...' // Only show partial webhook for security
+      }),
+      {
+        status: 200,
+        headers: createSecurityHeaders()
+      }
+    );
+
+  } catch (error) {
+    console.error('Test Slack notification failed:', error);
+    const sanitizedMessage = sanitizeErrorMessage(error, 'Failed to send test Slack notification');
+    
+    return new Response(
+      JSON.stringify({
+        error: sanitizedMessage,
+        code: 'SLACK_TEST_FAILED',
+        message: 'The Slack webhook test failed. Check your webhook URL and network connectivity.'
+      }),
+      {
+        status: 500,
+        headers: createSecurityHeaders()
+      }
+    );
+  }
+}
+/**
+ * Handles E2E test endpoint - fetches URL content, summarizes it, and sends to Slack
+ */
+export async function handleTestE2E(request: Request, env: Env): Promise<Response> {
+  try {
+    // Rate limiting check
+    const clientIP = request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For') || 'unknown';
+    const isAllowed = await checkRateLimit(env, `admin:test-e2e:${clientIP}`, 2, 300000); // 2 requests per 5 minutes
+    if (!isAllowed) {
+      return createRateLimitResponse(300); // 5 minutes
+    }
+
+    // Authenticate the request
+    const authResult = authenticateAdminRequest(request, env.ADMIN_TOKEN);
+    if (!authResult.authenticated) {
+      return createAuthErrorResponse(authResult);
+    }
+
+    // Parse request body for URL
+    let requestBody: any;
+    try {
+      const bodyText = await request.text();
+      if (!bodyText.trim()) {
+        return new Response(
+          JSON.stringify({
+            error: 'Request body is required',
+            code: 'INVALID_REQUEST',
+            message: 'Please provide a JSON body with a "url" field'
+          }),
+          {
+            status: 400,
+            headers: createSecurityHeaders()
+          }
+        );
+      }
+      requestBody = JSON.parse(bodyText);
+    } catch (parseError) {
+      return new Response(
+        JSON.stringify({
+          error: 'Invalid JSON in request body',
+          code: 'INVALID_JSON',
+          message: 'Request body must be valid JSON with a "url" field'
+        }),
+        {
+          status: 400,
+          headers: createSecurityHeaders()
+        }
+      );
+    }
+
+    // Validate URL parameter
+    if (!requestBody.url || typeof requestBody.url !== 'string') {
+      return new Response(
+        JSON.stringify({
+          error: 'Missing or invalid URL',
+          code: 'INVALID_REQUEST',
+          message: 'Please provide a valid "url" field in the request body'
+        }),
+        {
+          status: 400,
+          headers: createSecurityHeaders()
+        }
+      );
+    }
+
+    const testUrl = requestBody.url;
+    const timestamp = new Date().toISOString();
+    const startTime = Date.now();
+
+    console.log(`E2E test triggered for URL: ${testUrl}`);
+
+    // Step 1: Fetch the URL content
+    let htmlContent: string;
+    let fetchDuration: number;
+    try {
+      const fetchStart = Date.now();
+      htmlContent = await fetchContent(testUrl);
+      fetchDuration = Date.now() - fetchStart;
+      console.log(`URL fetch completed in ${fetchDuration}ms, content length: ${htmlContent.length}`);
+    } catch (error) {
+      console.error(`Failed to fetch URL ${testUrl}:`, error);
+      return new Response(
+        JSON.stringify({
+          error: 'Failed to fetch URL',
+          code: 'FETCH_FAILED',
+          url: testUrl,
+          message: error instanceof Error ? error.message : String(error),
+          timestamp
+        }),
+        {
+          status: 400,
+          headers: createSecurityHeaders()
+        }
+      );
+    }
+
+    // Step 2: Create content summary
+    const summary = await createContentSummary(testUrl, htmlContent);
+
+    // Step 3: Send summary to Slack
+    let slackSuccess = false;
+    let slackError: string | null = null;
+    if (env.SLACK_WEBHOOK) {
+      try {
+        const testMessage = formatE2ESlackMessage(testUrl, summary, fetchDuration, timestamp);
+        await sendSlackNotification(env.SLACK_WEBHOOK, testMessage);
+        slackSuccess = true;
+        console.log('E2E test notification sent to Slack successfully');
+      } catch (error) {
+        slackError = error instanceof Error ? error.message : String(error);
+        console.error('Failed to send E2E test notification to Slack:', error);
+      }
+    }
+
+    const totalDuration = Date.now() - startTime;
+
+    return new Response(
+      JSON.stringify({
+        message: 'E2E test completed successfully',
+        timestamp,
+        duration: totalDuration,
+        results: {
+          url: testUrl,
+          fetchSuccess: true,
+          fetchDuration,
+          contentLength: htmlContent.length,
+          slackSuccess,
+          slackError,
+          summary: {
+            title: summary.title,
+            contentType: summary.contentType,
+            promotionsFound: summary.promotionsFound,
+            keyElements: summary.keyElements.slice(0, 3)
+          }
+        }
+      }),
+      {
+        status: 200,
+        headers: createSecurityHeaders()
+      }
+    );
+
+  } catch (error) {
+    console.error('E2E test failed:', error);
+    const sanitizedMessage = sanitizeErrorMessage(error, 'Failed to execute E2E test');
+    
+    return new Response(
+      JSON.stringify({
+        error: sanitizedMessage,
+        code: 'E2E_TEST_FAILED',
+        message: 'The E2E test failed. Check the URL and try again.'
+      }),
+      {
+        status: 500,
+        headers: createSecurityHeaders()
+      }
+    );
+  }
+}
+
+/**
+ * Creates a summary of HTML content for E2E testing
+ */
+async function createContentSummary(url: string, htmlContent: string): Promise<{
+  title: string;
+  contentType: string;
+  contentLength: number;
+  promotionsFound: number;
+  keyElements: string[];
+  metaDescription?: string;
+}> {
+  // Extract title
+  const titleMatch = htmlContent.match(/<title[^>]*>(.*?)<\/title>/i);
+  const title = titleMatch ? titleMatch[1].replace(/<[^>]*>/g, '').trim() : 'No title found';
+
+  // Extract meta description
+  const metaMatch = htmlContent.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']*)["']/i);
+  const metaDescription = metaMatch ? metaMatch[1].trim() : undefined;
+
+  // Determine content type
+  const contentType = htmlContent.includes('costcotravel.com') ? 'Costco Travel Page' : 'Web Page';
+
+  // Try to parse promotions using existing logic
+  let promotionsFound = 0;
+  try {
+    const promotions = await parsePromotions(htmlContent, '.promo, .deal-info, .savings, .hot-buy, .offer-details');
+    promotionsFound = promotions.length;
+  } catch (error) {
+    console.warn('Failed to parse promotions for summary:', error);
+  }
+
+  // Extract key elements (prices, dates, deals)
+  const keyElements: string[] = [];
+
+  // Find price patterns
+  const priceMatches = htmlContent.match(/\$[\d,]+(?:\.\d{2})?/g);
+  if (priceMatches) {
+    const uniquePrices = [...new Set(priceMatches.slice(0, 5))];
+    keyElements.push(...uniquePrices.map(price => `Price: ${price}`));
+  }
+
+  // Find date patterns
+  const dateMatches = htmlContent.match(/(?:valid|expires?|through|until)[^.]*?(?:\d{4}|\d{1,2}\/\d{1,2})/gi);
+  if (dateMatches) {
+    keyElements.push(...dateMatches.slice(0, 2).map(date => `Date: ${date.trim()}`));
+  }
+
+  // Find common deal keywords
+  const dealKeywords = ['save', 'discount', 'off', 'free', 'bonus', 'special'];
+  const textContent = htmlContent.replace(/<[^>]*>/g, ' ').toLowerCase();
+  for (const keyword of dealKeywords) {
+    const regex = new RegExp(`\\b${keyword}[^.!?]{0,50}`, 'gi');
+    const matches = textContent.match(regex);
+    if (matches) {
+      keyElements.push(`Deal: ${matches[0].trim()}`);
+      break;
+    }
+  }
+
+  return {
+    title,
+    contentType,
+    contentLength: htmlContent.length,
+    promotionsFound,
+    keyElements: keyElements.slice(0, 5),
+    metaDescription
+  };
+}
+
+/**
+ * Formats E2E test results for Slack notification
+ */
+function formatE2ESlackMessage(
+  url: string,
+  summary: any,
+  fetchDuration: number,
+  timestamp: string
+): SlackMessage {
+  const blocks: SlackBlock[] = [];
+
+  // Header
+  blocks.push({
+    type: 'header',
+    text: {
+      type: 'plain_text',
+      text: '🧪 E2E Test Results',
+      emoji: true
+    }
+  });
+
+  // URL and timestamp
+  blocks.push({
+    type: 'context',
+    elements: [
+      {
+        type: 'mrkdwn',
+        text: `<${url}|View Page> • ${formatTimestamp(timestamp)} • Fetch: ${fetchDuration}ms`
+      }
+    ]
+  });
+
+  // Summary section
+  blocks.push({
+    type: 'section',
+    text: {
+      type: 'mrkdwn',
+      text: `*Page Summary:*\n*Title:* ${escapeSlackMarkdown(summary.title)}\n*Type:* ${summary.contentType}\n*Content:* ${Math.round(summary.contentLength / 1024)}KB\n*Promotions:* ${summary.promotionsFound} found`
+    }
+  });
+
+  // Meta description if available
+  if (summary.metaDescription) {
+    blocks.push({
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `*Description:* ${escapeSlackMarkdown(summary.metaDescription)}`
+      }
+    });
+  }
+
+  // Key elements
+  if (summary.keyElements.length > 0) {
+    blocks.push({ type: 'divider' });
+    blocks.push({
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `*Key Elements Found:*\n${summary.keyElements.map((elem: string) => `• ${escapeSlackMarkdown(elem)}`).join('\n')}`
+      }
+    });
+  }
+
+  // Status footer
+  blocks.push({
+    type: 'context',
+    elements: [
+      {
+        type: 'mrkdwn',
+        text: '✅ E2E test completed successfully - URL fetch and Slack notification working'
+      }
+    ]
+  });
+
+  return { blocks };
 }
