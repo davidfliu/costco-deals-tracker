@@ -6,6 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Costco Travel Deal Watcher is a serverless Cloudflare Workers application that monitors Costco Travel URLs for promotional changes and sends Slack notifications when material changes are detected. The system runs on a cron schedule (every 3 hours) and provides admin APIs for manual target management and execution.
 
+**Status**: ✅ Production deployed with URL-specific deal extraction and rich Slack notifications. Currently monitoring 2 Kauai hotel URLs with targeted analysis of resort credits, fee waivers, and package values.
+
+For a complete feature overview and usage examples, see the [README.md](README.md).
+
 ## Development Commands
 
 ### Core Development

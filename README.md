@@ -51,8 +51,8 @@ A serverless monitoring system that tracks promotional changes on Costco Travel 
 
 The application is **currently deployed and running** at:
 - **Production URL**: https://costco-deals-tracker-production.rumalzliu.workers.dev
-- **Monitoring**: Costco Travel Hot Buys page every 3 hours
-- **Status**: ✅ Active and operational
+- **Monitoring**: 2 Kauai hotel URLs (package deals + room rates) every 3 hours
+- **Status**: ✅ Active and operational with enhanced deal extraction
 
 #### Deploy Latest Changes
 
@@ -93,24 +93,25 @@ If setting up a new deployment:
 
 ### Admin API
 
-Use the admin API to manage monitoring targets:
+The system provides comprehensive admin endpoints for monitoring management:
 
 ```bash
 # List all configured targets
 curl -H "Authorization: Bearer your-admin-token" \
   https://costco-deals-tracker-production.rumalzliu.workers.dev/admin/targets
 
-# Add a new target to monitor
+# Add/update monitoring targets
 curl -X POST \
   -H "Authorization: Bearer your-admin-token" \
   -H "Content-Type: application/json" \
   -d '{
     "targets": [
       {
-        "url": "https://www.costcotravel.com/Travel-Offers/Travel-Hot-Buys",
-        "name": "Costco Travel Hot Buys",
+        "url": "https://www.costcotravel.com/Vacation-Packages/Offers/HAWLIH1HOTELHANALEIBAY20230309",
+        "name": "Kauai: 1 Hotel Hanalei Bay Package",
         "enabled": true,
-        "selector": ".promo, .deal-info, .savings, .hot-buy, .offer-details, .price, .discount"
+        "selector": ".deal-info, .package-details, .offer-details, .promo-info, .price, .resort-credit",
+        "notes": "Individual hotel package monitoring for Hanalei Bay resort"
       }
     ]
   }' \
@@ -120,7 +121,25 @@ curl -X POST \
 curl -X POST \
   -H "Authorization: Bearer your-admin-token" \
   https://costco-deals-tracker-production.rumalzliu.workers.dev/admin/run
+
+# Test Slack integration
+curl -X POST \
+  -H "Authorization: Bearer your-admin-token" \
+  https://costco-deals-tracker-production.rumalzliu.workers.dev/admin/test-slack
+
+# End-to-end URL testing with detailed analysis
+curl -X POST \
+  -H "Authorization: Bearer your-admin-token" \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://www.costcotravel.com/any-url-to-analyze"}' \
+  https://costco-deals-tracker-production.rumalzliu.workers.dev/admin/test-e2e
 ```
+
+### Current Monitoring Targets
+
+**Active Monitoring (2 targets):**
+1. **Kauai: 1 Hotel Hanalei Bay Package** - Promotional package deals
+2. **Kauai: 1 Hotel Hanalei Bay - Hotel Rates** - General room rates and availability
 
 ### Health Check
 
@@ -133,17 +152,27 @@ curl https://costco-deals-tracker-production.rumalzliu.workers.dev/healthz
 ### ✅ Production Ready
 - **Serverless Architecture**: Deployed on Cloudflare Workers
 - **Scheduled Monitoring**: Automatic checks every 3 hours via cron
-- **Slack Notifications**: Real-time alerts when deals change
-- **Admin API**: Full CRUD operations for target management
+- **Rich Slack Notifications**: Detailed alerts with deal breakdowns, emojis, and pricing
+- **Admin API**: Full CRUD operations for target management plus testing endpoints
 - **Security**: Bearer token authentication with constant-time comparison
 - **Error Resilience**: Individual target failures don't affect batch processing
 - **Performance**: Parallel processing with HTMLRewriter optimization
 
-### ✅ Monitoring Capabilities  
+### ✅ Enhanced Monitoring Capabilities  
+- **URL-Specific Extraction**: Targeted content analysis for each monitored URL
 - **Change Detection**: Content-based hashing with material change filtering
 - **State Management**: Current state + historical snapshots with auto-pruning
-- **Content Parsing**: Advanced HTML parsing for promotional content
+- **Advanced Content Parsing**: Extracts hotel names, locations, pricing, savings, resort credits
 - **Noise Filtering**: Ignores minor text variations and timestamps
+- **Debug & Testing**: E2E testing workflow with console logging and detailed analysis
+
+### ✅ Smart Deal Analysis
+- **Resort Credit Detection**: $300 resort credit (per room, per stay)
+- **Fee Waiver Tracking**: Waived daily resort fees ($59 value per day)
+- **Package Value Extraction**: Included extras valued at $536 for four-night stays
+- **Location Identification**: Automatic destination detection (Kauai, Hawaii, etc.)
+- **Price Context**: "from $536", "per night", "per person" context analysis
+- **HTML Entity Decoding**: Proper symbol rendering (♦, •, etc.)
 
 ### ✅ Infrastructure
 - **KV Storage**: Persistent state and configuration storage
@@ -153,6 +182,20 @@ curl https://costco-deals-tracker-production.rumalzliu.workers.dev/healthz
 
 ## Development Status
 
-**Status**: ✅ **Production Deployed and Operational**
+**Status**: ✅ **Production Deployed and Operational with Enhanced Features**
 
-The application is fully developed, tested, and deployed to production. It's currently monitoring the Costco Travel Hot Buys page and will send Slack notifications when promotional changes are detected.
+The application is fully developed, tested, and deployed to production with advanced deal extraction capabilities. It's currently monitoring 2 Kauai hotel URLs and will send rich, detailed Slack notifications when promotional changes are detected.
+
+### Recent Enhancements
+- **URL-Specific Extraction**: Custom parsing logic for each monitored URL
+- **Rich Slack Notifications**: Comprehensive deal summaries with pricing and package details
+- **E2E Testing Workflow**: Instant validation of URL monitoring and Slack integration
+- **Debug Capabilities**: Console logging and detailed API responses for development
+- **Targeted Monitoring**: Focus on specific resort credits, fee waivers, and package values
+
+### Architecture Highlights
+- **Serverless**: Cloudflare Workers with KV storage
+- **Scalable**: Parallel processing with error isolation
+- **Reliable**: Comprehensive test coverage and production monitoring
+- **Secure**: Token-based authentication and input validation
+- **Maintainable**: TypeScript, modular architecture, and comprehensive documentation
