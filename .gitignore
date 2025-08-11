@@ -37,4 +37,11 @@ coverage/
 
 # Temporary files
 *.tmp
-*.temp
+*.temp# Build outputs
+*.js
+*.js.map
+dist/
+
+# Environment
+.env
+.dev.vars

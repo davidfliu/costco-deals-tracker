@@ -7,25 +7,25 @@ compatibility_flags = ["nodejs_compat"]
 [build]
 command = "npm run build"
 
-# KV namespace bindings for development
+# KV namespace bindings for development (top-level default)
 kv_namespaces = [
-  { binding = "DEAL_WATCHER", id = "your-dev-kv-namespace-id", preview_id = "your-dev-kv-namespace-id" }
+  { binding = "DEAL_WATCHER", id = "f060b6ab17da4e43a168e44da8744a04", preview_id = "f060b6ab17da4e43a168e44da8744a04" }
 ]
 
 # Cron trigger - runs every 3 hours
-[[triggers.crons]]
-cron = "0 */3 * * *"
+[triggers]
+crons = ["0 */3 * * *"]
 
 # Production environment configuration
 [env.production]
 kv_namespaces = [
-  { binding = "DEAL_WATCHER", id = "your-prod-kv-namespace-id" }
+  { binding = "DEAL_WATCHER", id = "1e887257efa04d869bcd10443ab855ee" }
 ]
 
 # Development environment configuration
 [env.development]
 kv_namespaces = [
-  { binding = "DEAL_WATCHER", id = "your-dev-kv-namespace-id" }
+  { binding = "DEAL_WATCHER", id = "f060b6ab17da4e43a168e44da8744a04" }
 ]
 
 # Environment variables (set via wrangler secret put)
