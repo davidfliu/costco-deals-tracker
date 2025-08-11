@@ -1,4 +1,4 @@
-name = "costco-travel-watcher"
+name = "costco-deals-tracker"
 main = "src/index.ts"
 compatibility_date = "2025-08-08"
 compatibility_flags = ["nodejs_compat"]
