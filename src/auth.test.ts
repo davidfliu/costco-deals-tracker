@@ -487,18 +487,16 @@ describe('Authentication Middleware', () => {
     });
 
     it('should handle multiple Authorization headers', () => {
-      // Note: This test depends on how the Request constructor handles duplicate headers
-      // In most implementations, only the first or last value is kept
+      // Duplicate headers are combined into a comma-separated string
       const request = new Request('https://example.com', {
         headers: [
           ['Authorization', `Bearer ${invalidToken}`],
           ['Authorization', `Bearer ${validToken}`]
         ]
       });
-      
+
       const token = extractAuthToken(request);
-      // The behavior here depends on the implementation
-      expect(typeof token).toBe('string');
+      expect(token).toBe(`${invalidToken}, Bearer ${validToken}`);
     });
 
     it('should handle Latin characters in headers', () => {
