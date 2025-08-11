@@ -2221,6 +2221,37 @@ export async function handleTestE2E(request: Request, env: Env): Promise<Respons
       }
     }
 
+    // Log the deals to console for debugging
+    console.log('=== E2E TEST RESULTS ===');
+    console.log(`URL: ${testUrl}`);
+    console.log(`Title: ${summary.title}`);
+    console.log(`Deals found: ${summary.deals?.length || 0}`);
+    
+    if (summary.deals && summary.deals.length > 0) {
+      console.log('\n--- EXTRACTED DEALS ---');
+      summary.deals.forEach((deal, index) => {
+        console.log(`\n${index + 1}. ${deal.title}`);
+        if (deal.price) console.log(`   💰 Price: ${deal.price}`);
+        if (deal.savings) console.log(`   💸 Savings: ${deal.savings}`);
+        if (deal.location) console.log(`   📍 Location: ${deal.location}`);
+        if (deal.dates) console.log(`   📅 Dates: ${deal.dates}`);
+        if (deal.description && deal.description !== deal.title) {
+          const shortDesc = deal.description.length > 100 
+            ? deal.description.substring(0, 100) + '...' 
+            : deal.description;
+          console.log(`   📝 Description: ${shortDesc}`);
+        }
+      });
+    }
+    
+    if (summary.keyElements && summary.keyElements.length > 0) {
+      console.log('\n--- KEY ELEMENTS ---');
+      summary.keyElements.forEach((element, index) => {
+        console.log(`${index + 1}. ${element}`);
+      });
+    }
+    console.log('========================\n');
+
     const totalDuration = Date.now() - startTime;
 
     return new Response(
@@ -2239,7 +2270,8 @@ export async function handleTestE2E(request: Request, env: Env): Promise<Respons
             title: summary.title,
             contentType: summary.contentType,
             promotionsFound: summary.promotionsFound,
-            keyElements: summary.keyElements.slice(0, 3)
+            keyElements: summary.keyElements.slice(0, 3),
+            deals: summary.deals || [] // Include full deals array
           }
         }
       }),
@@ -2276,6 +2308,15 @@ async function createContentSummary(url: string, htmlContent: string): Promise<{
   contentLength: number;
   promotionsFound: number;
   keyElements: string[];
+  deals: Array<{
+    title: string;
+    description: string;
+    price?: string;
+    originalPrice?: string;
+    savings?: string;
+    location?: string;
+    dates?: string;
+  }>;
   metaDescription?: string;
 }> {
   // Extract title
@@ -2292,48 +2333,279 @@ async function createContentSummary(url: string, htmlContent: string): Promise<{
   // Try to parse promotions using existing logic
   let promotionsFound = 0;
   try {
-    const promotions = await parsePromotions(htmlContent, '.promo, .deal-info, .savings, .hot-buy, .offer-details');
+    const promotions = await parsePromotions(htmlContent, '.promo, .deal-info, .savings, .hot-buy, .offer-details, .deal-card, .package-card, .offer-card');
     promotionsFound = promotions.length;
   } catch (error) {
     console.warn('Failed to parse promotions for summary:', error);
   }
 
-  // Extract key elements (prices, dates, deals)
+  // Extract detailed deal information
+  const deals = extractDetailedDeals(htmlContent);
+  
+  // Debug: log a sample of the content for analysis
+  if (url.includes('costcotravel.com')) {
+    const textSample = htmlContent.replace(/<script[^>]*>.*?<\/script>/gs, '')
+      .replace(/<style[^>]*>.*?<\/style>/gs, '')
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .substring(0, 2000);
+    console.log('Content sample for deal extraction:', textSample);
+  }
+  
+  // Extract key elements (prices, dates, deals) - keep for backward compatibility
   const keyElements: string[] = [];
 
-  // Find price patterns
-  const priceMatches = htmlContent.match(/\$[\d,]+(?:\.\d{2})?/g);
-  if (priceMatches) {
-    const uniquePrices = [...new Set(priceMatches.slice(0, 5))];
-    keyElements.push(...uniquePrices.map(price => `Price: ${price}`));
-  }
+  // Find price patterns with context
+  const priceContext = extractPricesWithContext(htmlContent);
+  keyElements.push(...priceContext.slice(0, 3));
 
-  // Find date patterns
-  const dateMatches = htmlContent.match(/(?:valid|expires?|through|until)[^.]*?(?:\d{4}|\d{1,2}\/\d{1,2})/gi);
+  // Find date patterns with context
+  const dateMatches = htmlContent.match(/(?:valid|expires?|through|until|book\s+by|travel\s+by)[^.!?]{0,80}?(?:\d{1,2}\/\d{1,2}\/\d{2,4}|\d{4}-\d{2}-\d{2}|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2},?\s+\d{4})/gi);
   if (dateMatches) {
-    keyElements.push(...dateMatches.slice(0, 2).map(date => `Date: ${date.trim()}`));
+    keyElements.push(...dateMatches.slice(0, 2).map(date => `Date: ${date.trim().replace(/\s+/g, ' ')}`));
   }
 
-  // Find common deal keywords
-  const dealKeywords = ['save', 'discount', 'off', 'free', 'bonus', 'special'];
-  const textContent = htmlContent.replace(/<[^>]*>/g, ' ').toLowerCase();
-  for (const keyword of dealKeywords) {
-    const regex = new RegExp(`\\b${keyword}[^.!?]{0,50}`, 'gi');
-    const matches = textContent.match(regex);
-    if (matches) {
-      keyElements.push(`Deal: ${matches[0].trim()}`);
-      break;
-    }
-  }
+  // Find location-specific deals
+  const locationDeals = extractLocationDeals(htmlContent);
+  keyElements.push(...locationDeals.slice(0, 2));
 
   return {
     title,
     contentType,
     contentLength: htmlContent.length,
     promotionsFound,
-    keyElements: keyElements.slice(0, 5),
+    keyElements: keyElements.slice(0, 6),
+    deals: deals.slice(0, 8), // Show up to 8 deals
     metaDescription
   };
+}
+
+/**
+ * Extracts detailed deal information from HTML content
+ */
+function extractDetailedDeals(htmlContent: string): Array<{
+  title: string;
+  description: string;
+  price?: string;
+  originalPrice?: string;
+  savings?: string;
+  location?: string;
+  dates?: string;
+}> {
+  const deals: Array<{
+    title: string;
+    description: string;
+    price?: string;
+    originalPrice?: string;
+    savings?: string;
+    location?: string;
+    dates?: string;
+  }> = [];
+
+  // Remove HTML tags and normalize whitespace for text processing
+  const textContent = htmlContent.replace(/<script[^>]*>.*?<\/script>/gs, '')
+    .replace(/<style[^>]*>.*?<\/style>/gs, '')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\s+/g, ' ');
+
+  // Look for deal patterns in the text content
+  // Pattern 1: Hotel + Location + Price combinations
+  const hotelPatterns = [
+    /([A-Z][^.!?]{10,80}(?:hotel|resort|inn|lodge|suites?|grand|palace|plaza|hyatt|marriott|hilton|sheraton|westin|renaissance|courtyard|doubletree|embassy|hampton|holiday|fairmont|four\s+seasons|ritz[\-\s]?carlton|st\.?\s+regis)[^.!?]{0,40})[^.!?]{0,100}?(\$[\d,]+(?:\.\d{2})?)/gi,
+    /((?:las vegas|hawaii|caribbean|europe|asia|mexico|cancun|cabo|puerto vallarta|maui|oahu|kauai|big island|bahamas|jamaica|costa rica|belize|paris|london|rome|tokyo|dubai)[^.!?]{5,80})[^.!?]{0,80}?(\$[\d,]+(?:\.\d{2})?)/gi
+  ];
+
+  for (const pattern of hotelPatterns) {
+    let match;
+    while ((match = pattern.exec(textContent)) !== null && deals.length < 8) {
+      const description = match[1].trim();
+      const price = match[2];
+      
+      if (description.length > 15 && description.length < 200) {
+        // Extract location from description - try multiple patterns
+        let location;
+        const locationPatterns = [
+          /(las vegas|hawaii|caribbean|europe|asia|mexico|cancun|cabo|los cabos|puerto vallarta|maui|oahu|kauai|big island|hawaii island|bahamas|jamaica|costa rica|belize|paris|london|rome|tokyo|dubai|florida|california|new york|orlando|miami)/i,
+          /([A-Z][a-z]+)\s*:/,  // Pattern like "Oahu:" or "Cabo:"
+          /:\s*([A-Z][^,\n]{10,40})/  // Pattern after colon
+        ];
+        
+        for (const pattern of locationPatterns) {
+          const match = description.match(pattern);
+          if (match && match[1]) {
+            location = match[1].trim();
+            // Clean up location
+            if (location.toLowerCase() === 'hawaii island') location = 'Hawaii Island';
+            if (location.toLowerCase() === 'los cabos') location = 'Los Cabos';
+            break;
+          }
+        }
+        
+        // Clean up the description first
+        let cleanDescription = description
+          .replace(/&quot;/g, '"')
+          .replace(/&#x27;/g, "'")
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&nbsp;/g, ' ')
+          .replace(/^\s*[a-z]{2,4}:\s*/i, '') // Remove artifacts like "mas:", "nbsp:", etc.
+          .replace(/^\s*nbsp;\s*/i, '') // Remove nbsp artifacts
+          .replace(/^\s*tant\s/i, 'Instant ') // Fix "tant" -> "Instant"
+          .replace(/^\s*gital\s/i, 'Digital ') // Fix "gital" -> "Digital"
+          .replace(/\s+/g, ' ')
+          .trim();
+
+        // Extract title - look for natural breaks
+        let title = cleanDescription;
+        
+        // Try to find a good breaking point for the title
+        const breakPoints = [
+          /^([^:]{15,80}:?\s*[^:]{10,40})\s+Package/i,  // Include location info before "Package"
+          /^([^.]{20,90})\s+\$\d+/i,  // Break before price mentions
+          /^([^.]{15,80})\s+(?:Exclusive|Save|Book by)/i,  // Break before common keywords
+          /^([^:]{15,80}):/,  // Break at first colon after reasonable length
+          /^([^.]{15,80})\./,  // Break at first period
+          /^(.{20,80})(?:\s+Package|\s+\$)/i,  // Break before "Package" or price
+          /^(.{20,70})$/  // Take the whole thing if it's reasonable length
+        ];
+        
+        for (const pattern of breakPoints) {
+          const match = cleanDescription.match(pattern);
+          if (match && match[1].trim().length >= 15) {
+            title = match[1].trim();
+            break;
+          }
+        }
+        
+        // Fallback: take first 60 characters at word boundary
+        if (title === cleanDescription && title.length > 60) {
+          const words = title.split(' ');
+          let truncated = '';
+          for (const word of words) {
+            if ((truncated + ' ' + word).length > 60) break;
+            truncated += (truncated ? ' ' : '') + word;
+          }
+          title = truncated || title.substring(0, 50);
+        }
+        
+        // Look for savings information near this deal
+        const dealIndex = textContent.indexOf(match[0]);
+        const nearbyText = textContent.substring(Math.max(0, dealIndex - 100), dealIndex + 200);
+        const savingsMatch = nearbyText.match(/save\s+(?:up\s+to\s+)?(\$[\d,]+)|(\d+)%\s+off|(was\s+)?(\$[\d,]+)/i);
+        const savings = savingsMatch ? savingsMatch[0] : undefined;
+
+        // Look for date information
+        const datesMatch = nearbyText.match(/(?:valid|through|until|expires?)[^.!?]{0,40}?(\d{1,2}\/\d{1,2}\/\d{2,4}|\d{4}-\d{2}-\d{2})/i);
+        const dates = datesMatch ? datesMatch[0].trim() : undefined;
+
+        deals.push({
+          title,
+          description: cleanDescription,
+          price,
+          location,
+          savings,
+          dates
+        });
+      }
+    }
+  }
+
+  // Pattern 2: Package deals with "from" pricing
+  const packagePattern = /([^.!?]{20,100}(?:package|vacation|getaway|escape|deal)[^.!?]{0,40})\s+from\s+(\$[\d,]+)/gi;
+  let packageMatch;
+  while ((packageMatch = packagePattern.exec(textContent)) !== null && deals.length < 8) {
+    const description = packageMatch[1].trim();
+    const price = packageMatch[2];
+    
+    if (description.length > 20 && description.length < 150) {
+      const title = description.substring(0, 60).trim() + (description.length > 60 ? '...' : '');
+      
+      deals.push({
+        title,
+        description,
+        price
+      });
+    }
+  }
+
+  // Pattern 3: Specific savings amounts
+  const savingsPattern = /([^.!?]{20,80})\s+save\s+(up\s+to\s+)?(\$[\d,]+|\d+%)/gi;
+  let savingsMatch;
+  while ((savingsMatch = savingsPattern.exec(textContent)) !== null && deals.length < 8) {
+    const description = savingsMatch[1].trim();
+    const savings = `Save ${savingsMatch[2] || ''}${savingsMatch[3]}`;
+    
+    if (description.length > 15 && description.length < 120) {
+      const title = description.substring(0, 50).trim() + (description.length > 50 ? '...' : '');
+      
+      deals.push({
+        title,
+        description,
+        savings
+      });
+    }
+  }
+
+  return deals;
+}
+
+/**
+ * Extracts prices with more context about what they're for
+ */
+function extractPricesWithContext(htmlContent: string): string[] {
+  const priceContext: string[] = [];
+  const textContent = htmlContent.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
+  
+  // Look for prices with context before/after
+  const pricePattern = /([^.!?]{0,40})(\$[\d,]+(?:\.\d{2})?)([^.!?]{0,40})/g;
+  let match;
+  while ((match = pricePattern.exec(textContent)) !== null && priceContext.length < 5) {
+    const before = match[1].trim();
+    const price = match[2];
+    const after = match[3].trim();
+    
+    // Create meaningful context
+    let context = '';
+    if (before.length > 5 && (before.includes('from') || before.includes('starting') || before.includes('as low as'))) {
+      context = `${before.split(' ').slice(-3).join(' ')} ${price}`;
+    } else if (after.length > 5 && (after.includes('night') || after.includes('person') || after.includes('package'))) {
+      context = `${price} ${after.split(' ').slice(0, 3).join(' ')}`;
+    } else {
+      context = `Price: ${price}`;
+    }
+    
+    // Clean up the context
+    context = context.replace(/\s+/g, ' ').trim();
+    if (context.length > 10 && context.length < 80) {
+      priceContext.push(context);
+    }
+  }
+  
+  return priceContext;
+}
+
+/**
+ * Extracts location-specific deals
+ */
+function extractLocationDeals(htmlContent: string): string[] {
+  const locationDeals: string[] = [];
+  const textContent = htmlContent.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
+  
+  const locations = ['hawaii', 'vegas', 'caribbean', 'mexico', 'europe', 'asia', 'cancun', 'cabo', 'maui', 'bahamas', 'jamaica'];
+  
+  for (const location of locations) {
+    const pattern = new RegExp(`([^.!?]{20,80}${location}[^.!?]{0,40})`, 'gi');
+    let match;
+    while ((match = pattern.exec(textContent)) !== null && locationDeals.length < 5) {
+      const deal = match[1].trim().replace(/\s+/g, ' ');
+      if (deal.length > 25 && deal.length < 100) {
+        locationDeals.push(`Location: ${deal}`);
+      }
+    }
+  }
+  
+  return locationDeals;
 }
 
 /**
@@ -2388,8 +2660,73 @@ function formatE2ESlackMessage(
     });
   }
 
-  // Key elements
-  if (summary.keyElements.length > 0) {
+  // Detailed deals section
+  if (summary.deals && summary.deals.length > 0) {
+    blocks.push({ type: 'divider' });
+    blocks.push({
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `*🎯 Deals Found (${summary.deals.length}):*`
+      }
+    });
+
+    // Show top deals with rich formatting
+    const topDeals = summary.deals.slice(0, 4); // Show max 4 deals to avoid message length limits
+    for (const deal of topDeals) {
+      let dealText = `*${escapeSlackMarkdown(deal.title)}*`;
+      
+      // Add price and savings info
+      const priceInfo = [];
+      if (deal.price) priceInfo.push(`💰 ${deal.price}`);
+      if (deal.savings) priceInfo.push(`💸 ${deal.savings}`);
+      if (priceInfo.length > 0) {
+        dealText += `\n${priceInfo.join(' • ')}`;
+      }
+      
+      // Add location if available
+      if (deal.location) {
+        dealText += `\n📍 ${escapeSlackMarkdown(deal.location)}`;
+      }
+      
+      // Add dates if available
+      if (deal.dates) {
+        dealText += `\n📅 ${escapeSlackMarkdown(deal.dates)}`;
+      }
+      
+      // Add description (truncated)
+      if (deal.description && deal.description !== deal.title) {
+        const shortDesc = deal.description.length > 100 
+          ? deal.description.substring(0, 100) + '...' 
+          : deal.description;
+        dealText += `\n_${escapeSlackMarkdown(shortDesc)}_`;
+      }
+
+      blocks.push({
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: dealText
+        }
+      });
+    }
+
+    // Show count of remaining deals
+    if (summary.deals.length > topDeals.length) {
+      blocks.push({
+        type: 'context',
+        elements: [
+          {
+            type: 'mrkdwn',
+            text: `_... and ${summary.deals.length - topDeals.length} more deals found on the page_`
+          }
+        ]
+      });
+    }
+  }
+
+  // Key elements (fallback if no detailed deals found)
+  if (summary.keyElements && summary.keyElements.length > 0 && (!summary.deals || summary.deals.length === 0)) {
     blocks.push({ type: 'divider' });
     blocks.push({
       type: 'section',
