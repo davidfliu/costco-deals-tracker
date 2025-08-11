@@ -286,7 +286,8 @@ export async function processBatchTargets(env: Env): Promise<BatchProcessingResu
     );
 
     // Step 6: Log performance metrics (only in development/debug mode)
-    if (process.env.NODE_ENV !== 'production') {
+    const nodeEnv = (globalThis as any).process?.env?.NODE_ENV;
+    if (nodeEnv !== 'production') {
       const perfStats = monitor.getStats();
       console.log('Performance metrics:', perfStats);
     }
