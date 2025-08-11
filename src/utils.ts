@@ -2339,8 +2339,8 @@ async function createContentSummary(url: string, htmlContent: string): Promise<{
     console.warn('Failed to parse promotions for summary:', error);
   }
 
-  // Extract detailed deal information
-  const deals = extractDetailedDeals(htmlContent);
+  // Extract detailed deal information with URL-specific logic
+  const deals = extractDetailedDeals(htmlContent, url);
   
   // Debug: log a sample of the content for analysis
   if (url.includes('costcotravel.com')) {
@@ -2381,9 +2381,118 @@ async function createContentSummary(url: string, htmlContent: string): Promise<{
 }
 
 /**
- * Extracts detailed deal information from HTML content
+ * Extracts detailed deal information from HTML content with URL-specific logic
  */
-function extractDetailedDeals(htmlContent: string): Array<{
+function extractDetailedDeals(htmlContent: string, url: string): Array<{
+  title: string;
+  description: string;
+  price?: string;
+  originalPrice?: string;
+  savings?: string;
+  location?: string;
+  dates?: string;
+}> {
+  const deals: Array<{
+    title: string;
+    description: string;
+    price?: string;
+    originalPrice?: string;
+    savings?: string;
+    location?: string;
+    dates?: string;
+  }> = [];
+
+  // URL-specific extraction logic
+  if (url.includes('HAWLIH1HOTELHANALEIBAY20230309')) {
+    return extractHanaleiBayPackageDeals(htmlContent);
+  }
+
+  // Default/generic extraction for other URLs
+  return extractGenericDeals(htmlContent);
+}
+
+/**
+ * Extracts deal information specifically for Hanalei Bay package URL
+ */
+function extractHanaleiBayPackageDeals(htmlContent: string): Array<{
+  title: string;
+  description: string;
+  price?: string;
+  originalPrice?: string;
+  savings?: string;
+  location?: string;
+  dates?: string;
+}> {
+  const deals: Array<{
+    title: string;
+    description: string;
+    price?: string;
+    originalPrice?: string;
+    savings?: string;
+    location?: string;
+    dates?: string;
+  }> = [];
+
+  // Clean text content
+  const textContent = htmlContent
+    .replace(/<script[^>]*>.*?<\/script>/gs, '')
+    .replace(/<style[^>]*>.*?<\/style>/gs, '')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&diams;/g, '♦')
+    .replace(/&bull;/g, '•')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ');
+
+  // Extract the $300 resort credit detail
+  const resortCreditMatch = textContent.match(/\$300\s+resort\s+credit[^.!?]{0,100}(?:per\s+room[^.!?]*)?(?:per\s+stay[^.!?]*)?/i);
+  if (resortCreditMatch) {
+    deals.push({
+      title: '$300 Resort Credit',
+      description: resortCreditMatch[0].trim().replace(/\s+/g, ' '),
+      price: '$300',
+      location: 'Kauai'
+    });
+  }
+
+  // Extract the waived resort fee detail
+  const feeWaiverMatch = textContent.match(/waived\s+(?:mandatory\s+)?(?:daily\s+)?resort\s+fee[^.!?]{0,150}(?:\$59[^.!?]{0,50})?(?:value[^.!?]{0,20})?(?:per\s+day[^.!?]*)?/i);
+  if (feeWaiverMatch) {
+    deals.push({
+      title: 'Waived Daily Resort Fee',
+      description: feeWaiverMatch[0].trim().replace(/\s+/g, ' '),
+      savings: '$59 per day',
+      location: 'Kauai'
+    });
+  }
+
+  // Extract the $536 included extras value
+  const extrasValueMatch = textContent.match(/included\s+extras[^.!?]{0,100}\$536[^.!?]{0,100}four[^.!?]*night[^.!?]*stay/i);
+  if (extrasValueMatch) {
+    deals.push({
+      title: 'Included Extras Value',
+      description: extrasValueMatch[0].trim().replace(/\s+/g, ' '),
+      price: '$536',
+      location: 'Kauai'
+    });
+  }
+
+  // Extract main hotel package info
+  const hotelMatch = textContent.match(/(?:kauai[^.!?]{0,20})?1\s+hotel\s+hanalei\s+bay[^.!?]{0,100}package[^.!?]{0,150}/i);
+  if (hotelMatch) {
+    deals.push({
+      title: 'Kauai: 1 Hotel Hanalei Bay Package',
+      description: hotelMatch[0].trim().replace(/\s+/g, ' '),
+      location: 'Kauai'
+    });
+  }
+
+  return deals;
+}
+
+/**
+ * Generic deal extraction for other URLs
+ */
+function extractGenericDeals(htmlContent: string): Array<{
   title: string;
   description: string;
   price?: string;
@@ -2421,7 +2530,7 @@ function extractDetailedDeals(htmlContent: string): Array<{
       const description = match[1].trim();
       const price = match[2];
       
-      if (description.length > 15 && description.length < 200) {
+      if (description.length > 15 && description.length < 350) {
         // Extract location from description - try multiple patterns
         let location;
         const locationPatterns = [
@@ -2449,10 +2558,18 @@ function extractDetailedDeals(htmlContent: string): Array<{
           .replace(/&lt;/g, '<')
           .replace(/&gt;/g, '>')
           .replace(/&nbsp;/g, ' ')
+          .replace(/&diams;/g, '♦') // Diamond symbol
+          .replace(/&clubs;/g, '♣') // Club symbol
+          .replace(/&hearts;/g, '♥') // Heart symbol
+          .replace(/&spades;/g, '♠') // Spade symbol
+          .replace(/&bull;/g, '•') // Bullet symbol
+          .replace(/&#8226;/g, '•') // Bullet symbol (numeric)
           .replace(/^\s*[a-z]{2,4}:\s*/i, '') // Remove artifacts like "mas:", "nbsp:", etc.
           .replace(/^\s*nbsp;\s*/i, '') // Remove nbsp artifacts
           .replace(/^\s*tant\s/i, 'Instant ') // Fix "tant" -> "Instant"
           .replace(/^\s*gital\s/i, 'Digital ') // Fix "gital" -> "Digital"
+          .replace(/^\s*or\s+call\s+/i, '') // Remove "or call" artifacts
+          .replace(/^\s*Home\s+Vacation\s+Packages\s*/i, '') // Remove navigation artifacts
           .replace(/\s+/g, ' ')
           .trim();
 
@@ -2542,6 +2659,52 @@ function extractDetailedDeals(htmlContent: string): Array<{
       deals.push({
         title,
         description,
+        savings
+      });
+    }
+  }
+
+  // Pattern 4: Resort credits and fee waivers (Costco Travel specific)
+  const resortCreditPattern = /([^.!?]{10,150}(?:\$\d+[^.!?]{20,200}resort\s+credit[^.!?]{0,100}|waived[^.!?]{20,100}resort\s+fee[^.!?]{0,100}|included\s+extras[^.!?]{20,150}))/gi;
+  let creditMatch;
+  while ((creditMatch = resortCreditPattern.exec(textContent)) !== null && deals.length < 8) {
+    const description = creditMatch[1].trim();
+    
+    if (description.length > 20 && description.length < 300) {
+      // Clean up the description
+      let cleanDesc = description
+        .replace(/&diams;/g, '♦')
+        .replace(/&bull;/g, '•')
+        .replace(/\s+/g, ' ')
+        .trim();
+      
+      // Extract title from the description
+      let title = '';
+      if (cleanDesc.includes('resort credit')) {
+        const creditMatch = cleanDesc.match(/(\$\d+[^.!?]*resort\s+credit[^.!?]*)/i);
+        title = creditMatch ? creditMatch[1].trim() : cleanDesc.substring(0, 60);
+      } else if (cleanDesc.includes('waived') && cleanDesc.includes('resort fee')) {
+        const waiverMatch = cleanDesc.match(/(waived[^.!?]*resort\s+fee[^.!?]*)/i);
+        title = waiverMatch ? waiverMatch[1].trim() : cleanDesc.substring(0, 60);
+      } else if (cleanDesc.includes('included extras')) {
+        const extrasMatch = cleanDesc.match(/(included\s+extras[^.!?]*)/i);
+        title = extrasMatch ? extrasMatch[1].trim() : cleanDesc.substring(0, 60);
+      } else {
+        title = cleanDesc.substring(0, 60);
+      }
+      
+      // Extract pricing information
+      const priceMatch = cleanDesc.match(/\$[\d,]+/);
+      const price = priceMatch ? priceMatch[0] : undefined;
+      
+      // Extract savings information
+      const savingsMatch = cleanDesc.match(/\$[\d,]+\s*value|\$[\d,]+\s*per\s+day/i);
+      const savings = savingsMatch ? savingsMatch[0] : undefined;
+      
+      deals.push({
+        title: title.length > 60 ? title.substring(0, 60) + '...' : title,
+        description: cleanDesc,
+        price,
         savings
       });
     }
