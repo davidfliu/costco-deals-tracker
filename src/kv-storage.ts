@@ -6,6 +6,87 @@ import { Target, TargetState, HistoricalSnapshot, Env } from "./types";
 import { generateStateKey, generateHistoryKey } from "./utils";
 
 /**
+ * Validates that a URL is safe and whitelisted for targets
+ * 
+ * @param url - URL to validate
+ * @returns True if URL is safe
+ */
+function validateTargetUrl(url: string): boolean {
+  try {
+    const parsedUrl = new URL(url);
+    
+    // Only allow HTTPS for external requests
+    if (parsedUrl.protocol !== 'https:') {
+      return false;
+    }
+    
+    // Block internal/private IP ranges and metadata endpoints
+    const hostname = parsedUrl.hostname.toLowerCase();
+    if (
+      hostname === 'localhost' ||
+      hostname.startsWith('127.') ||
+      hostname.startsWith('10.') ||
+      hostname.startsWith('172.16.') || hostname.startsWith('172.17.') ||
+      hostname.startsWith('172.18.') || hostname.startsWith('172.19.') ||
+      hostname.startsWith('172.20.') || hostname.startsWith('172.21.') ||
+      hostname.startsWith('172.22.') || hostname.startsWith('172.23.') ||
+      hostname.startsWith('172.24.') || hostname.startsWith('172.25.') ||
+      hostname.startsWith('172.26.') || hostname.startsWith('172.27.') ||
+      hostname.startsWith('172.28.') || hostname.startsWith('172.29.') ||
+      hostname.startsWith('172.30.') || hostname.startsWith('172.31.') ||
+      hostname.startsWith('192.168.') ||
+      hostname === '169.254.169.254' || // AWS/Azure metadata
+      hostname === 'metadata.google.internal' || // GCP metadata
+      hostname.endsWith('.internal') ||
+      hostname.endsWith('.local') ||
+      hostname.includes('169.254.') // Link-local addresses
+    ) {
+      return false;
+    }
+    
+    // Only allow specific domains (whitelist approach)
+    const allowedDomains = [
+      'costcotravel.com',
+      'costco.com',
+      'www.costcotravel.com',
+      'www.costco.com'
+    ];
+    
+    return allowedDomains.some(domain => 
+      hostname === domain || hostname.endsWith(`.${domain}`)
+    );
+    
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Validates CSS selector for security
+ * 
+ * @param selector - CSS selector to validate
+ * @returns True if selector is safe
+ */
+function validateCssSelector(selector: string): boolean {
+  // Sanitize CSS selector - only allow safe patterns
+  const selectorPattern = /^[.#]?[\w\-\s,.:>\[\]="'()]+$/;
+  if (!selectorPattern.test(selector) || selector.length > 200) {
+    return false;
+  }
+  
+  // Block potentially dangerous patterns
+  const dangerousPatterns = [
+    /javascript:/i,
+    /expression\(/i,
+    /url\(/i,
+    /@import/i,
+    /behavior:/i
+  ];
+  
+  return !dangerousPatterns.some(pattern => pattern.test(selector));
+}
+
+/**
  * Key used to store the targets configuration in KV
  */
 const TARGETS_KEY = "targets";
@@ -30,23 +111,38 @@ export function validateTarget(target: any): target is Target {
     return false;
   }
 
-  // Optional fields validation
-  if (target.name !== undefined && typeof target.name !== 'string') {
+  // Validate URL with security checks
+  if (!validateTargetUrl(target.url)) {
     return false;
   }
 
-  if (target.notes !== undefined && typeof target.notes !== 'string') {
+  // Validate CSS selector for security
+  if (!validateCssSelector(target.selector)) {
     return false;
+  }
+
+  // Optional fields validation with length limits
+  if (target.name !== undefined) {
+    if (typeof target.name !== 'string' || target.name.length > 100 || target.name.length === 0) {
+      return false;
+    }
+    // Sanitize name - no HTML tags or scripts
+    if (/<[^>]+>/.test(target.name) || /javascript:/i.test(target.name)) {
+      return false;
+    }
+  }
+
+  if (target.notes !== undefined) {
+    if (typeof target.notes !== 'string' || target.notes.length > 500) {
+      return false;
+    }
+    // Sanitize notes - no HTML tags or scripts
+    if (/<script[^>]*>/i.test(target.notes) || /javascript:/i.test(target.notes)) {
+      return false;
+    }
   }
 
   if (target.enabled !== undefined && typeof target.enabled !== 'boolean') {
-    return false;
-  }
-
-  // URL validation - basic check for valid URL format
-  try {
-    new URL(target.url);
-  } catch {
     return false;
   }
 

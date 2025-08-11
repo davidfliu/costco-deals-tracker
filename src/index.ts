@@ -11,6 +11,28 @@ import { Env } from './types';
  */
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    // Validate environment variables on startup
+    const { validateEnvironment } = await import('./utils');
+    const envErrors = validateEnvironment(env);
+    if (envErrors.length > 0) {
+      console.error('Environment validation failed:', envErrors);
+      return new Response(
+        JSON.stringify({
+          error: 'Server configuration error',
+          code: 'CONFIGURATION_ERROR'
+        }),
+        {
+          status: 500,
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Content-Type-Options': 'nosniff',
+            'X-Frame-Options': 'DENY',
+            'X-XSS-Protection': '1; mode=block'
+          }
+        }
+      );
+    }
+
     const url = new URL(request.url);
     const { pathname, method } = { pathname: url.pathname, method: request.method };
 
@@ -74,7 +96,10 @@ export default {
         {
           status: 200,
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'X-Content-Type-Options': 'nosniff',
+            'X-Frame-Options': 'DENY',
+            'X-XSS-Protection': '1; mode=block'
           }
         }
       );

@@ -1107,22 +1107,38 @@ function formatPromotionChangeForSlack(previous: Promotion, current: Promotion):
 }
 
 /**
- * Escapes special characters in text for Slack markdown
+ * Escapes special characters in text for Slack markdown and prevents XSS
  * 
  * @param text - Text to escape
- * @returns Escaped text safe for Slack markdown
+ * @returns Sanitized text safe for Slack markdown
  */
 function escapeSlackMarkdown(text: string): string {
   if (!text) return '';
   
   return text
+    // First escape HTML entities (before removing tags)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+    // Then remove potentially dangerous content (already escaped)
+    .replace(/&lt;script[^&]*&gt;.*?&lt;\/script&gt;/gis, '') // Remove script tags
+    .replace(/&lt;iframe[^&]*&gt;.*?&lt;\/iframe&gt;/gis, '') // Remove iframe tags
+    .replace(/&lt;object[^&]*&gt;.*?&lt;\/object&gt;/gis, '') // Remove object tags
+    .replace(/&lt;embed[^&]*&gt;/gi, '') // Remove embed tags
+    .replace(/&lt;link[^&]*&gt;/gi, '') // Remove link tags
+    .replace(/&lt;meta[^&]*&gt;/gi, '') // Remove meta tags
+    .replace(/javascript:/gi, '') // Remove javascript: URLs
+    .replace(/data:text\/html/gi, '') // Remove data URLs with HTML
+    .replace(/on\w+\s*=/gi, '') // Remove event handlers (onclick, onload, etc.)
+    // Finally escape Slack markdown
     .replace(/\*/g, '\\*')
     .replace(/_/g, '\\_')
     .replace(/~/g, '\\~')
-    .replace(/`/g, '\\`');
+    .replace(/`/g, '\\`')
+    // Limit length to prevent abuse
+    .substring(0, 3000);
 }
 
 /**
@@ -1356,12 +1372,242 @@ export function createAuthErrorResponse(authResult: AuthResult): Response {
     }),
     {
       status: 401,
-      headers: {
-        'Content-Type': 'application/json',
+      headers: createSecurityHeaders({
         'WWW-Authenticate': 'Bearer'
-      }
+      })
     }
   );
+}
+
+/**
+ * Creates secure headers for all responses
+ * 
+ * @param additionalHeaders - Additional headers to include
+ * @returns Headers object with security headers
+ */
+function createSecurityHeaders(additionalHeaders: Record<string, string> = {}): Record<string, string> {
+  return {
+    'Content-Type': 'application/json',
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'X-XSS-Protection': '1; mode=block',
+    'Referrer-Policy': 'strict-origin-when-cross-origin',
+    'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+    'Pragma': 'no-cache',
+    'Expires': '0',
+    'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
+    ...additionalHeaders
+  };
+}
+
+/**
+ * Validates environment variables for security
+ * 
+ * @param env - Environment variables
+ * @returns Array of validation errors, empty if valid
+ */
+export function validateEnvironment(env: Env): string[] {
+  const errors: string[] = [];
+  
+  // Validate ADMIN_TOKEN
+  if (!env.ADMIN_TOKEN) {
+    errors.push('ADMIN_TOKEN is required');
+  } else {
+    if (env.ADMIN_TOKEN.length < 32) {
+      errors.push('ADMIN_TOKEN must be at least 32 characters long');
+    }
+    if (!/^[a-zA-Z0-9_-]+$/.test(env.ADMIN_TOKEN)) {
+      errors.push('ADMIN_TOKEN contains invalid characters (only alphanumeric, underscore, and dash allowed)');
+    }
+  }
+  
+  // Validate SLACK_WEBHOOK
+  if (!env.SLACK_WEBHOOK) {
+    errors.push('SLACK_WEBHOOK is required');
+  } else {
+    try {
+      const webhookUrl = new URL(env.SLACK_WEBHOOK);
+      if (webhookUrl.protocol !== 'https:') {
+        errors.push('SLACK_WEBHOOK must use HTTPS');
+      }
+      if (!webhookUrl.hostname.endsWith('slack.com')) {
+        errors.push('SLACK_WEBHOOK must be a slack.com domain');
+      }
+      if (!webhookUrl.pathname.startsWith('/services/')) {
+        errors.push('SLACK_WEBHOOK must be a valid Slack webhook URL');
+      }
+    } catch {
+      errors.push('SLACK_WEBHOOK is not a valid URL');
+    }
+  }
+  
+  // Validate KV namespace
+  if (!env.DEAL_WATCHER) {
+    errors.push('DEAL_WATCHER KV namespace is required');
+  }
+  
+  return errors;
+}
+
+/**
+ * Rate limiting using KV storage
+ * 
+ * @param env - Environment with KV access
+ * @param identifier - Unique identifier (IP address or user ID)
+ * @param limit - Maximum requests per window
+ * @param windowMs - Time window in milliseconds
+ * @returns True if request is allowed
+ */
+async function checkRateLimit(env: Env, identifier: string, limit: number = 10, windowMs: number = 60000): Promise<boolean> {
+  try {
+    // Check if KV namespace is available (for tests)
+    if (!env.DEAL_WATCHER || typeof env.DEAL_WATCHER.get !== 'function') {
+      return true; // Allow request if KV is not available (test mode)
+    }
+    
+    const now = Date.now();
+    const windowStart = now - windowMs;
+    const key = `rate_limit:${await hashString(identifier)}:${Math.floor(now / windowMs)}`;
+    
+    // Get current count
+    const currentCountStr = await env.DEAL_WATCHER.get(key);
+    const currentCount = currentCountStr ? parseInt(currentCountStr, 10) : 0;
+    
+    if (currentCount >= limit) {
+      return false; // Rate limit exceeded
+    }
+    
+    // Increment counter with TTL
+    await env.DEAL_WATCHER.put(key, String(currentCount + 1), {
+      expirationTtl: Math.ceil(windowMs / 1000) // Convert to seconds
+    });
+    
+    return true; // Request allowed
+  } catch (error) {
+    console.error('Rate limiting error:', error);
+    // If rate limiting fails, allow the request (fail open)
+    return true;
+  }
+}
+
+/**
+ * Creates a rate limit exceeded response
+ * 
+ * @param retryAfter - Seconds until retry is allowed
+ * @returns Response with 429 status
+ */
+function createRateLimitResponse(retryAfter: number = 60): Response {
+  return new Response(
+    JSON.stringify({
+      error: 'Too many requests',
+      code: 'RATE_LIMIT_EXCEEDED',
+      retryAfter
+    }),
+    {
+      status: 429,
+      headers: createSecurityHeaders({
+        'Retry-After': String(retryAfter)
+      })
+    }
+  );
+}
+
+/**
+ * Sanitizes error messages to prevent information disclosure
+ * 
+ * @param error - Error to sanitize
+ * @param context - Context for logging (server-side only)
+ * @returns Sanitized error message safe for client
+ */
+function sanitizeErrorMessage(error: unknown, context: string = ''): string {
+  // Log full error details server-side for debugging
+  if (context) {
+    console.error(`${context}:`, error);
+  }
+  
+  // Return generic message to client to prevent information disclosure
+  if (error instanceof Error) {
+    // Only return safe, generic error messages
+    const errorMessage = error.message.toLowerCase();
+    
+    if (errorMessage.includes('network') || errorMessage.includes('timeout') || errorMessage.includes('fetch')) {
+      return 'Network request failed';
+    }
+    if (errorMessage.includes('parse') || errorMessage.includes('json')) {
+      return 'Data parsing error';
+    }
+    if (errorMessage.includes('validation') || errorMessage.includes('invalid')) {
+      return 'Invalid input provided';
+    }
+    if (errorMessage.includes('permission') || errorMessage.includes('access')) {
+      return 'Access denied';
+    }
+    if (errorMessage.includes('not found') || errorMessage.includes('404')) {
+      return 'Resource not found';
+    }
+    if (errorMessage.includes('url not allowed')) {
+      return 'Invalid or disallowed URL';
+    }
+  }
+  
+  // Default generic message
+  return 'An error occurred while processing your request';
+}
+
+/**
+ * Validates that a URL is safe to fetch and whitelisted
+ * 
+ * @param url - URL to validate
+ * @returns True if URL is safe to fetch
+ */
+function validateTargetUrl(url: string): boolean {
+  try {
+    const parsedUrl = new URL(url);
+    
+    // Only allow HTTPS for external requests
+    if (parsedUrl.protocol !== 'https:') {
+      return false;
+    }
+    
+    // Block internal/private IP ranges and metadata endpoints
+    const hostname = parsedUrl.hostname.toLowerCase();
+    if (
+      hostname === 'localhost' ||
+      hostname.startsWith('127.') ||
+      hostname.startsWith('10.') ||
+      hostname.startsWith('172.16.') || hostname.startsWith('172.17.') ||
+      hostname.startsWith('172.18.') || hostname.startsWith('172.19.') ||
+      hostname.startsWith('172.20.') || hostname.startsWith('172.21.') ||
+      hostname.startsWith('172.22.') || hostname.startsWith('172.23.') ||
+      hostname.startsWith('172.24.') || hostname.startsWith('172.25.') ||
+      hostname.startsWith('172.26.') || hostname.startsWith('172.27.') ||
+      hostname.startsWith('172.28.') || hostname.startsWith('172.29.') ||
+      hostname.startsWith('172.30.') || hostname.startsWith('172.31.') ||
+      hostname.startsWith('192.168.') ||
+      hostname === '169.254.169.254' || // AWS/Azure metadata
+      hostname === 'metadata.google.internal' || // GCP metadata
+      hostname.endsWith('.internal') ||
+      hostname.endsWith('.local') ||
+      hostname.includes('169.254.') // Link-local addresses
+    ) {
+      return false;
+    }
+    
+    // Only allow specific domains (whitelist approach)
+    const allowedDomains = [
+      'costcotravel.com',
+      'costco.com',
+      'www.costcotravel.com',
+      'www.costco.com'
+    ];
+    
+    return allowedDomains.some(domain => 
+      hostname === domain || hostname.endsWith(`.${domain}`)
+    );
+    
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -1373,6 +1619,10 @@ export function createAuthErrorResponse(authResult: AuthResult): Response {
  * @throws Error if fetch fails or returns non-200 status
  */
 export async function fetchContent(url: string, timeoutMs: number = 30000): Promise<string> {
+  // Validate URL before making request
+  if (!validateTargetUrl(url)) {
+    throw new Error('URL not allowed: Only HTTPS URLs from approved Costco domains are permitted');
+  }
   // Create abort controller for timeout handling
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -1430,6 +1680,13 @@ export async function fetchContent(url: string, timeoutMs: number = 30000): Prom
  * @returns HTTP response with targets configuration or error
  */
 export async function handleGetTargets(request: Request, env: Env): Promise<Response> {
+  // Rate limiting check
+  const clientIP = request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For') || 'unknown';
+  const isAllowed = await checkRateLimit(env, `admin:${clientIP}`, 30, 300000); // 30 requests per 5 minutes
+  if (!isAllowed) {
+    return createRateLimitResponse(300); // 5 minutes
+  }
+
   // Authenticate the request
   const authResult = authenticateAdminRequest(request, env.ADMIN_TOKEN);
   if (!authResult.authenticated) {
@@ -1452,26 +1709,21 @@ export async function handleGetTargets(request: Request, env: Env): Promise<Resp
       }, null, 2),
       {
         status: 200,
-        headers: {
-          'Content-Type': 'application/json'
-        }
+        headers: createSecurityHeaders()
       }
     );
 
   } catch (error) {
-    console.error('Failed to retrieve targets:', error);
+    const sanitizedMessage = sanitizeErrorMessage(error, 'Failed to retrieve targets');
     
     return new Response(
       JSON.stringify({
-        error: 'Failed to retrieve targets configuration',
-        code: 'INTERNAL_ERROR',
-        details: error instanceof Error ? error.message : String(error)
+        error: sanitizedMessage,
+        code: 'INTERNAL_ERROR'
       }),
       {
         status: 500,
-        headers: {
-          'Content-Type': 'application/json'
-        }
+        headers: createSecurityHeaders()
       }
     );
   }
@@ -1485,6 +1737,13 @@ export async function handleGetTargets(request: Request, env: Env): Promise<Resp
  * @returns HTTP response with success confirmation or error
  */
 export async function handlePostTargets(request: Request, env: Env): Promise<Response> {
+  // Rate limiting check
+  const clientIP = request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For') || 'unknown';
+  const isAllowed = await checkRateLimit(env, `admin:${clientIP}`, 20, 300000); // 20 requests per 5 minutes
+  if (!isAllowed) {
+    return createRateLimitResponse(300); // 5 minutes
+  }
+
   // Authenticate the request
   const authResult = authenticateAdminRequest(request, env.ADMIN_TOKEN);
   if (!authResult.authenticated) {
@@ -1598,26 +1857,21 @@ export async function handlePostTargets(request: Request, env: Env): Promise<Res
       }),
       {
         status: 200,
-        headers: {
-          'Content-Type': 'application/json'
-        }
+        headers: createSecurityHeaders()
       }
     );
 
   } catch (error) {
-    console.error('Failed to update targets:', error);
+    const sanitizedMessage = sanitizeErrorMessage(error, 'Failed to update targets');
     
     return new Response(
       JSON.stringify({
-        error: 'Failed to update targets configuration',
-        code: 'INTERNAL_ERROR',
-        details: error instanceof Error ? error.message : String(error)
+        error: sanitizedMessage,
+        code: 'INTERNAL_ERROR'
       }),
       {
         status: 500,
-        headers: {
-          'Content-Type': 'application/json'
-        }
+        headers: createSecurityHeaders()
       }
     );
   }
@@ -1632,6 +1886,13 @@ export async function handlePostTargets(request: Request, env: Env): Promise<Res
  */
 export async function handleManualRun(request: Request, env: Env): Promise<Response> {
   try {
+    // Rate limiting check - stricter for manual runs
+    const clientIP = request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For') || 'unknown';
+    const isAllowed = await checkRateLimit(env, `admin:manual:${clientIP}`, 5, 300000); // 5 requests per 5 minutes
+    if (!isAllowed) {
+      return createRateLimitResponse(300); // 5 minutes
+    }
+
     // Authenticate the request
     const authResult = authenticateAdminRequest(request, env.ADMIN_TOKEN);
     if (!authResult.authenticated) {
@@ -1723,26 +1984,21 @@ export async function handleManualRun(request: Request, env: Env): Promise<Respo
       }),
       {
         status: 200,
-        headers: {
-          'Content-Type': 'application/json'
-        }
+        headers: createSecurityHeaders()
       }
     );
 
   } catch (error) {
-    console.error('Failed to execute manual run:', error);
+    const sanitizedMessage = sanitizeErrorMessage(error, 'Failed to execute manual run');
     
     return new Response(
       JSON.stringify({
-        error: 'Failed to execute manual run',
-        code: 'INTERNAL_ERROR',
-        details: error instanceof Error ? error.message : String(error)
+        error: sanitizedMessage,
+        code: 'INTERNAL_ERROR'
       }),
       {
         status: 500,
-        headers: {
-          'Content-Type': 'application/json'
-        }
+        headers: createSecurityHeaders()
       }
     );
   }
